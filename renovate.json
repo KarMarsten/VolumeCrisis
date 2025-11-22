@@ -1,3 +1,5 @@
 {
-  "baseBranches": ["main", "develop", "feature/VolumeCrisis"]
+  "extends": [
+    "config:base"
+  ]
 }
