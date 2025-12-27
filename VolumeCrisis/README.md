@@ -16,6 +16,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Volume Presets** - Save and quickly access favorite volume levels for different scenarios
 
 ### 📱 Smart Features
+- **Background Execution** - App runs continuously in the background when device sound is on
+- **System Volume Monitoring** - Automatically detects when device volume changes
 - **Volume Reminders** - Hourly notifications to check your volume levels
 - **Volume Guide Cards** - Recommended volume levels for different content types:
   - YouTube (60%) - Video content
@@ -77,6 +79,7 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### Core Components
 - **AudioManager** - Handles audio playback and volume control
+- **SystemVolumeMonitor** - Monitors system volume and manages background execution
 - **UserManager** - Manages user profiles and settings
 - **ContentView** - Main UI and user interactions
 - **UserProfile** - Data model for user information
@@ -94,6 +97,9 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - Volume control that respects ceiling limits
 - Fallback to system sounds when needed
 - Proper audio session management
+- Background audio session for continuous execution
+- System volume monitoring via AVAudioSession KVO
+- Silent audio loop to maintain background execution when device sound is on
 
 ### Data Management
 - In-memory user profiles and presets
@@ -132,7 +138,8 @@ We welcome contributions! Here's how you can help:
 
 ### Required Permissions
 - **Notifications** - For volume reminder alerts
-- **Audio** - For test sound playback
+- **Audio** - For test sound playback and background execution
+- **Background Modes** - Audio background mode enabled for continuous operation
 
 ### Data Storage
 - All data is stored locally on device
@@ -144,6 +151,7 @@ We welcome contributions! Here's how you can help:
 - Test sound uses custom tone generation (system sounds don't respect volume settings)
 - Volume controls only affect the app's test sound (iOS restrictions prevent system volume control)
 - Presets are stored in memory (will reset when app is closed)
+- Background execution requires device sound to be on (volume > 0)
 
 ## 🚧 Future Enhancements
 
@@ -153,6 +161,8 @@ We welcome contributions! Here's how you can help:
 - [ ] Integration with system volume controls
 - [ ] Custom notification sounds
 - [ ] Volume usage analytics
+- [ ] Background execution statistics
+- [ ] Configurable background execution behavior
 
 ## 📄 License
 
