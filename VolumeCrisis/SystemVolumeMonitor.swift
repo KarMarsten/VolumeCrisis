@@ -153,12 +153,20 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 }
                 
                 // Search recursively through subviews
-                func searchSubviews(_ view: UIView) -> UISlider? {
+                // Optimized to avoid deep recursion and reduce main thread blocking
+                func searchSubviews(_ view: UIView, depth: Int = 0) -> UISlider? {
+                    // Limit search depth to avoid performance issues on complex view hierarchies
+                    guard depth < 10 else { return nil }
+                    
+                    // Check current view first
                     if let slider = view as? UISlider {
                         return slider
                     }
-                    for subview in view.subviews {
-                        if let slider = searchSubviews(subview) {
+                    
+                    // Search subviews (limit to first 20 to avoid blocking on complex hierarchies)
+                    let subviewsToSearch = Array(view.subviews.prefix(20))
+                    for subview in subviewsToSearch {
+                        if let slider = searchSubviews(subview, depth: depth + 1) {
                             return slider
                         }
                     }
