@@ -5,8 +5,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ## 🌟 Features
 
 ### 🎛️ Volume Management
-- **Interactive Volume Slider** - Direct control over app volume with real-time feedback
-- **System Volume Safety Ceiling** - Enforce maximum iPad system volume for safety (works system-wide with YouTube, Music, all apps)
+- **Direct System Volume Control** - Control iPad system volume directly from the app (affects all apps including YouTube, Music, etc.)
+- **System Volume Safety Ceiling** - Enforce maximum iPad system volume for safety (works system-wide, automatically enforced)
 - **App Volume Ceiling** - Set maximum volume limits for app's test sound
 - **Smart Volume Constraints** - Volume automatically adjusts when ceiling is reduced
 - **Test Sound Playback** - Custom sine wave tone that respects volume settings
@@ -63,12 +63,14 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ### First Time Setup
 1. **Select a User** - Choose from existing users or create a new profile
 2. **Set System Volume Safety Ceiling** - Establish maximum allowed iPad volume (enforced system-wide)
-3. **Set App Volume Ceiling** - Establish maximum volume limit for app's test sound
-4. **Create Presets** - Add volume presets for different scenarios
-5. **Enable Reminders** - Turn on volume check notifications
+3. **Adjust System Volume** - Use the system volume slider to set your preferred iPad volume
+4. **Set App Volume Ceiling** - Establish maximum volume limit for app's test sound
+5. **Create Presets** - Add volume presets for different scenarios
+6. **Enable Reminders** - Turn on volume check notifications
 
 ### Daily Usage
-- **Adjust Volume** - Use the main slider to set your preferred volume
+- **Control System Volume** - Use the blue system volume slider to adjust iPad volume (works for all apps)
+- **Adjust App Volume** - Use the app volume slider to set test sound volume
 - **Quick Presets** - Tap preset buttons for instant volume changes
 - **Edit Presets** - Tap the pencil icon to modify preset name or volume
 - **Delete Presets** - Tap the trash icon to remove unwanted presets
@@ -76,8 +78,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Stay Aware** - Respond to volume reminder notifications
 
 ### Volume Controls
+- **System Volume Slider** - Blue slider to directly control iPad system volume (affects all apps, limited by ceiling)
 - **System Volume Safety Ceiling** - Orange slider to set maximum allowed iPad system volume (enforced automatically)
-- **Current System Volume** - Displays real-time system volume level
 - **App Volume Slider** - Controls app's test sound volume (0-100%)
 - **App Volume Ceiling** - Red slider sets maximum allowed app volume
 - **Preset Buttons** - Quick access to saved volume levels (tap to apply)
@@ -109,8 +111,9 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - Proper audio session management
 - Background audio session for continuous execution
 - System volume monitoring via AVAudioSession KVO (event-driven, battery efficient)
-- System volume control via MPVolumeView (enforces safety ceiling system-wide)
-- Real-time system volume enforcement when ceiling is exceeded
+- Direct system volume control via MPVolumeView (controls actual iPad volume)
+- System volume safety ceiling enforcement (automatically reduces volume when exceeded)
+- Real-time system volume monitoring and enforcement
 - Silent audio loop to maintain background execution when device sound is on
 - Optimized for battery life: 1-second audio buffers and 5-second volume check intervals
 
@@ -163,7 +166,7 @@ We welcome contributions! Here's how you can help:
 
 - Test sound uses custom tone generation (system sounds don't respect volume settings)
 - App volume controls only affect the app's test sound
-- System volume ceiling requires app to be running (foreground or background) to enforce
+- System volume control and ceiling enforcement require app to be running (foreground or background)
 - Presets are stored in memory (will reset when app is closed)
 - Background execution requires device sound to be on (volume > 0)
 

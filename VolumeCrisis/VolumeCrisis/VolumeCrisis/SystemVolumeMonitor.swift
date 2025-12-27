@@ -60,15 +60,27 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
             
             // Find the volume slider in the MPVolumeView
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Try multiple times as the slider may not be immediately available
+            func findSlider(attempt: Int = 0) {
+                guard attempt < 10 else {
+                    print("Warning: Could not find system volume slider after 10 attempts")
+                    return
+                }
+                
                 for subview in self.volumeView?.subviews ?? [] {
                     if let slider = subview as? UISlider {
                         self.volumeSlider = slider
-                        print("System volume slider found and ready")
-                        break
+                        print("System volume slider found and ready (attempt \(attempt + 1))")
+                        return
                     }
                 }
+                
+                // Retry if not found
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    findSlider(attempt: attempt + 1)
+                }
             }
+            findSlider()
         }
     }
     
@@ -77,16 +89,33 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Use MPVolumeView slider to set system volume
         DispatchQueue.main.async { [weak self] in
-            if let slider = self?.volumeSlider {
-                slider.value = clampedVolume
-                print("System volume set to: \(Int(clampedVolume * 100))%")
-            } else {
+            guard let self = self else { return }
+            
+            // Ensure slider is available
+            if self.volumeSlider == nil {
                 // Retry setup if slider not found
-                self?.setupVolumeControl()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.setupVolumeControl()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                     self?.volumeSlider?.value = clampedVolume
+                    // Trigger value changed event to ensure volume actually changes
+                    self?.volumeSlider?.sendActions(for: .valueChanged)
+                }
+                return
+            }
+            
+            // Set the volume value
+            self.volumeSlider?.value = clampedVolume
+            // Trigger value changed event to ensure the change takes effect
+            self.volumeSlider?.sendActions(for: .valueChanged)
+            
+            // Update our tracked volume after a brief delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                if let updatedVolume = self?.audioSession?.outputVolume {
+                    self?.systemVolume = updatedVolume
                 }
             }
+            
+            print("System volume set to: \(Int(clampedVolume * 100))%")
         }
     }
     

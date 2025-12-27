@@ -125,19 +125,35 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 8)
 
-                // System Volume Safety Ceiling Section
+                // System Volume Control Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("System Volume Safety")
+                    Text("System Volume Control")
                         .font(.headline)
                         .padding(.horizontal)
                     
                     VStack(spacing: 8) {
-                        HStack {
-                            Text("Current System Volume: \(Int(systemVolumeMonitor.systemVolume * 100))%")
-                                .font(.subheadline)
-                            Spacer()
+                        VStack(spacing: 8) {
+                            Text("System Volume: \(Int(systemVolumeMonitor.systemVolume * 100))%")
+                                .font(.headline)
+                            Text("(Controls actual iPad volume - affects all apps)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Slider(value: Binding(
+                                get: { systemVolumeMonitor.systemVolume },
+                                set: { newValue in
+                                    // Clamp to ceiling if one is set
+                                    let clampedValue = min(newValue, systemVolumeMonitor.systemVolumeCeiling)
+                                    systemVolumeMonitor.setSystemVolume(clampedValue)
+                                }
+                            ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
+                                .accentColor(.blue)
+                                .onChange(of: systemVolumeMonitor.systemVolume) { oldValue, newValue in
+                                    print("System volume changed to: \(Int(newValue * 100))%")
+                                }
                         }
-                        .padding(.horizontal)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                         
                         VStack(spacing: 8) {
                             Text("Safety Ceiling: \(Int(systemVolumeMonitor.systemVolumeCeiling * 100))%")
