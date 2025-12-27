@@ -6,7 +6,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### 🎛️ Volume Management
 - **Interactive Volume Slider** - Direct control over app volume with real-time feedback
-- **Volume Ceiling System** - Set maximum volume limits to prevent hearing damage
+- **System Volume Safety Ceiling** - Enforce maximum iPad system volume for safety (works system-wide with YouTube, Music, all apps)
+- **App Volume Ceiling** - Set maximum volume limits for app's test sound
 - **Smart Volume Constraints** - Volume automatically adjusts when ceiling is reduced
 - **Test Sound Playback** - Custom sine wave tone that respects volume settings
 
@@ -19,6 +20,7 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ### 📱 Smart Features
 - **Background Execution** - App runs continuously in the background when device sound is on
 - **System Volume Monitoring** - Automatically detects when device volume changes
+- **System Volume Enforcement** - Automatically reduces system volume if it exceeds the safety ceiling
 - **Volume Reminders** - Hourly notifications to check your volume levels
 - **Volume Guide Cards** - Recommended volume levels for different content types:
   - YouTube (60%) - Video content
@@ -60,9 +62,10 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### First Time Setup
 1. **Select a User** - Choose from existing users or create a new profile
-2. **Set Volume Ceiling** - Establish your maximum volume limit
-3. **Create Presets** - Add volume presets for different scenarios
-4. **Enable Reminders** - Turn on volume check notifications
+2. **Set System Volume Safety Ceiling** - Establish maximum allowed iPad volume (enforced system-wide)
+3. **Set App Volume Ceiling** - Establish maximum volume limit for app's test sound
+4. **Create Presets** - Add volume presets for different scenarios
+5. **Enable Reminders** - Turn on volume check notifications
 
 ### Daily Usage
 - **Adjust Volume** - Use the main slider to set your preferred volume
@@ -73,8 +76,10 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Stay Aware** - Respond to volume reminder notifications
 
 ### Volume Controls
-- **Main Slider** - Controls app volume (0-100%)
-- **Ceiling Slider** - Sets maximum allowed volume
+- **System Volume Safety Ceiling** - Orange slider to set maximum allowed iPad system volume (enforced automatically)
+- **Current System Volume** - Displays real-time system volume level
+- **App Volume Slider** - Controls app's test sound volume (0-100%)
+- **App Volume Ceiling** - Red slider sets maximum allowed app volume
 - **Preset Buttons** - Quick access to saved volume levels (tap to apply)
 - **Edit Button** - Pencil icon next to each preset to modify it
 - **Delete Button** - Trash icon next to each preset to remove it
@@ -83,8 +88,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ## 🏗️ Architecture
 
 ### Core Components
-- **AudioManager** - Handles audio playback and volume control
-- **SystemVolumeMonitor** - Monitors system volume and manages background execution
+- **AudioManager** - Handles audio playback and volume control for app's test sound
+- **SystemVolumeMonitor** - Monitors system volume, enforces safety ceiling, and manages background execution
 - **UserManager** - Manages user profiles and settings
 - **ContentView** - Main UI and user interactions
 - **UserProfile** - Data model for user information
@@ -104,6 +109,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - Proper audio session management
 - Background audio session for continuous execution
 - System volume monitoring via AVAudioSession KVO (event-driven, battery efficient)
+- System volume control via MPVolumeView (enforces safety ceiling system-wide)
+- Real-time system volume enforcement when ceiling is exceeded
 - Silent audio loop to maintain background execution when device sound is on
 - Optimized for battery life: 1-second audio buffers and 5-second volume check intervals
 
@@ -155,7 +162,8 @@ We welcome contributions! Here's how you can help:
 ## 🐛 Known Issues
 
 - Test sound uses custom tone generation (system sounds don't respect volume settings)
-- Volume controls only affect the app's test sound (iOS restrictions prevent system volume control)
+- App volume controls only affect the app's test sound
+- System volume ceiling requires app to be running (foreground or background) to enforce
 - Presets are stored in memory (will reset when app is closed)
 - Background execution requires device sound to be on (volume > 0)
 
@@ -170,10 +178,10 @@ The app is optimized for battery efficiency:
 
 ## 🚧 Future Enhancements
 
+- [x] System volume control and safety ceiling (implemented)
 - [ ] Persistent data storage for presets
 - [ ] Cloud sync for user profiles
 - [ ] Advanced audio analysis
-- [ ] Integration with system volume controls
 - [ ] Custom notification sounds
 - [ ] Volume usage analytics
 - [ ] Background execution statistics
