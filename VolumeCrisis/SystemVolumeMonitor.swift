@@ -410,6 +410,26 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
             print("⚠️ System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), enforcing ceiling...")
             
+            // Check if we have the volume slider - critical for enforcement
+            if volumeSlider == nil {
+                print("❌ CRITICAL: Volume slider not available for ceiling enforcement!")
+                print("❌ Attempting emergency slider setup...")
+                setupVolumeControl()
+                // Wait a moment and try again
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self else { return }
+                    if self.volumeSlider == nil {
+                        print("❌ FAILED: Volume slider still not available after emergency setup")
+                        print("❌ Ceiling enforcement cannot proceed without volume slider")
+                        print("📊 Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(self.systemVolumeCeiling * 100))%")
+                    } else {
+                        print("✅ Emergency slider setup successful, enforcing ceiling...")
+                        self.setSystemVolume(self.systemVolumeCeiling)
+                    }
+                }
+                return
+            }
+            
             // Update UI immediately to show we're enforcing
             systemVolume = systemVolumeCeiling
             
