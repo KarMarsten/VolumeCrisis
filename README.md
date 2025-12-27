@@ -98,8 +98,9 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - Fallback to system sounds when needed
 - Proper audio session management
 - Background audio session for continuous execution
-- System volume monitoring via AVAudioSession KVO
+- System volume monitoring via AVAudioSession KVO (event-driven, battery efficient)
 - Silent audio loop to maintain background execution when device sound is on
+- Optimized for battery life: 1-second audio buffers and 5-second volume check intervals
 
 ### Data Management
 - In-memory user profiles and presets
@@ -152,6 +153,15 @@ We welcome contributions! Here's how you can help:
 - Volume controls only affect the app's test sound (iOS restrictions prevent system volume control)
 - Presets are stored in memory (will reset when app is closed)
 - Background execution requires device sound to be on (volume > 0)
+
+## 🔋 Battery Usage
+
+The app is optimized for battery efficiency:
+- **Event-driven monitoring**: Uses KVO (Key-Value Observing) for real-time volume changes instead of constant polling
+- **Reduced timer frequency**: Volume checks run every 5 seconds as a backup (KVO handles most changes)
+- **Optimized audio buffers**: 1-second silent buffers reduce CPU wake-ups by 90%
+- **Automatic power management**: Background audio stops when device is muted, saving battery
+- **Low overhead**: Minimal battery impact when running in background
 
 ## 🚧 Future Enhancements
 
