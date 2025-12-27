@@ -34,11 +34,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         systemVolume = AVAudioSession.sharedInstance().outputVolume
         isDeviceSoundOn = systemVolume > 0.0
         
-        // Observe volume changes using KVO
+        // Observe volume changes using KVO (event-driven, battery efficient)
         audioSession?.addObserver(self, forKeyPath: "outputVolume", options: [.new], context: nil)
         
-        // Start periodic checks as backup
-        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // Periodic check as backup (reduced frequency to save battery)
+        // KVO handles most volume changes, this is just a safety net
+        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.checkVolume()
         }
         RunLoop.main.add(monitoringTimer!, forMode: .common)
@@ -84,9 +85,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         let audioEngine = AVAudioEngine()
         let playerNode = AVAudioPlayerNode()
         
-        // Create a very short silent buffer (100ms)
+        // Create a longer silent buffer (1 second) to reduce scheduling overhead
+        // Longer buffer = fewer callbacks = better battery life
         let sampleRate: Double = 44100
-        let duration: Double = 0.1
+        let duration: Double = 1.0
         let frameCount = Int(sampleRate * duration)
         
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
@@ -115,14 +117,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             playerNode.play()
             
             // Schedule buffer to loop continuously
+            // Use a weak capture to avoid retain cycles
             func scheduleBuffer() {
-                playerNode.scheduleBuffer(buffer, at: nil, options: []) {
+                playerNode.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
                     // Reschedule when buffer finishes to create infinite loop
-                    DispatchQueue.main.async {
-                        if self.backgroundEngine != nil {
-                            scheduleBuffer()
-                        }
-                    }
+                    guard let self = self, self.backgroundEngine != nil else { return }
+                    scheduleBuffer()
                 }
             }
             scheduleBuffer()
