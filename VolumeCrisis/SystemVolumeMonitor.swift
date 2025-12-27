@@ -278,17 +278,17 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         // Observe volume changes using KVO (event-driven, battery efficient)
         audioSession?.addObserver(self, forKeyPath: "outputVolume", options: [.new], context: nil)
         
-        // Periodic check as backup (reduced frequency to save battery)
-        // KVO handles most volume changes, this is just a safety net
-        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Periodic check as backup - more frequent to catch volume changes from other apps
+        // KVO handles most volume changes, but this ensures we catch changes from other apps
+        // Reduced to 2 seconds for better responsiveness, especially for ceiling enforcement
+        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.checkVolume()
         }
         RunLoop.main.add(monitoringTimer!, forMode: .common)
         
-        // Start background audio if sound is on
-        if isDeviceSoundOn {
-            startBackgroundAudio()
-        }
+        // Always start background audio to keep app running in background
+        // This is critical for ceiling enforcement when app is in background
+        startBackgroundAudio()
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -302,23 +302,20 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     private func checkVolume() {
-        // Don't override volume if we're actively setting it
-        if isSettingVolume {
-            // Check if enough time has passed since last volume set attempt
-            if let lastAttempt = lastVolumeSetAttempt, Date().timeIntervalSince(lastAttempt) < 1.0 {
-                return // Still within the grace period
-            } else {
-                // Grace period expired, reset flag
-                isSettingVolume = false
-            }
-        }
-        
         let newVolume = AVAudioSession.sharedInstance().outputVolume
         let wasSoundOn = isDeviceSoundOn
         
-        // Enforce volume ceiling - if volume exceeds ceiling, reduce it
-        // This is critical functionality - must work on both iOS and iPadOS
+        // CRITICAL: Enforce volume ceiling FIRST - this must always work, even if we're setting volume
+        // Ceiling enforcement takes priority over everything else for safety
         if newVolume > systemVolumeCeiling {
+            // Don't let isSettingVolume block ceiling enforcement - safety first!
+            // If we're in the middle of setting volume, we still need to enforce ceiling
+            if isSettingVolume {
+                // If we're setting volume but it exceeded ceiling, we need to enforce
+                // Reset the flag to allow enforcement
+                print("⚠️ Volume exceeded ceiling during volume set operation - enforcing ceiling immediately")
+                isSettingVolume = false
+            }
             print("⚠️ System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), enforcing ceiling...")
             
             // Update UI immediately to show we're enforcing
@@ -381,7 +378,17 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     private func startBackgroundAudio() {
         // Create a silent audio loop to keep the app running in background
-        guard backgroundEngine == nil else { return }
+        // This is CRITICAL for ceiling enforcement when app is in background
+        // Always start background audio to ensure app stays active for monitoring
+        guard backgroundEngine == nil else {
+            // Already running, but verify it's still active
+            if backgroundEngine?.isRunning == false {
+                print("Background audio stopped unexpectedly - restarting...")
+                stopBackgroundAudio()
+            } else {
+                return // Already running
+            }
+        }
         
         let audioEngine = AVAudioEngine()
         let playerNode = AVAudioPlayerNode()
