@@ -105,9 +105,8 @@ class UserManager: ObservableObject {
         users[index].presets.append(preset)
         print("Users array presets count: \(users[index].presets.count)")
         
-        // Trigger save by reassigning users array (triggers didSet)
-        let updatedUsers = users
-        users = updatedUsers
+        // Save users (didSet will trigger automatically, but we call saveUsers directly for clarity)
+        saveUsers()
         
         // Update selectedUser reference to point to the updated user
         if selectedUser?.id == user.id {
@@ -129,9 +128,8 @@ class UserManager: ObservableObject {
         
         users[userIndex].presets.removeAll { $0.id == preset.id }
         
-        // Trigger save by reassigning users array (triggers didSet)
-        let updatedUsers = users
-        users = updatedUsers
+        // Save users
+        saveUsers()
         
         // Update selectedUser if it's the same user
         if selectedUser?.id == user.id {
@@ -148,9 +146,8 @@ class UserManager: ObservableObject {
         if let presetIndex = users[userIndex].presets.firstIndex(where: { $0.id == presetId }) {
             users[userIndex].presets[presetIndex] = VolumePreset(id: presetId, name: newName, volume: newVolume)
             
-            // Trigger save by reassigning users array (triggers didSet)
-            let updatedUsers = users
-            users = updatedUsers
+            // Save users
+            saveUsers()
             
             // Update selectedUser if it's the same user
             if selectedUser?.id == user.id {
