@@ -10,6 +10,18 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     @Published var systemVolume: Float = 0.0
     private let systemVolumeCeilingKey = "savedSystemVolumeCeiling"
     
+    // Detect if running on iPad (iPadOS) vs iPhone (iOS)
+    var isRunningOniPad: Bool {
+        return UIDevice.current.userInterfaceIdiom == .pad
+    }
+    
+    // System volume control capability
+    // On iPadOS, apps have limited ability to change system volume programmatically
+    // On iOS (iPhone), system volume control works better
+    var canControlSystemVolume: Bool {
+        return !isRunningOniPad // Better support on iPhone
+    }
+    
     @Published var systemVolumeCeiling: Float = 1.0 {
         didSet {
             // Enforce ceiling immediately if current volume exceeds it
@@ -121,6 +133,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     func setSystemVolume(_ volume: Float) {
         let clampedVolume = max(0.0, min(1.0, volume))
+        
+        // On iPadOS, system volume control is limited - only enforce ceiling (reduce volume)
+        // On iOS, we can attempt to set volume directly
+        if isRunningOniPad && clampedVolume > systemVolume {
+            // On iPadOS, we can only reduce volume, not increase it
+            print("iPadOS: Can only reduce volume, not increase. Current: \(Int(systemVolume * 100))%, Requested: \(Int(clampedVolume * 100))%")
+            print("iPadOS: Cannot increase volume programmatically. Use physical buttons.")
+            return
+        }
         
         // Use MPVolumeView slider to set system volume
         DispatchQueue.main.async { [weak self] in

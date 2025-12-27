@@ -135,25 +135,46 @@ struct ContentView: View {
                         VStack(spacing: 8) {
                             Text("System Volume: \(Int(systemVolumeMonitor.systemVolume * 100))%")
                                 .font(.headline)
-                            Text("(Controls actual iPad volume - affects all apps)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("Note: System volume control may be limited on iPadOS. Use physical volume buttons if the slider doesn't respond.")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                                .padding(.top, 4)
-                            Slider(value: Binding(
-                                get: { systemVolumeMonitor.systemVolume },
-                                set: { newValue in
-                                    // Clamp to ceiling if one is set
-                                    let clampedValue = min(newValue, systemVolumeMonitor.systemVolumeCeiling)
-                                    systemVolumeMonitor.setSystemVolume(clampedValue)
-                                }
-                            ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
-                                .accentColor(.blue)
-                                .onChange(of: systemVolumeMonitor.systemVolume) { oldValue, newValue in
-                                    print("System volume changed to: \(Int(newValue * 100))%")
-                                }
+                            if systemVolumeMonitor.isRunningOniPad {
+                                Text("(iPadOS - Use physical volume buttons to change)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("Note: iPadOS restricts programmatic volume control. Use physical buttons, then the app will enforce the safety ceiling.")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                                    .padding(.top, 4)
+                            } else {
+                                Text("(iOS - Controls actual iPhone volume - affects all apps)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            if systemVolumeMonitor.canControlSystemVolume {
+                                // On iOS (iPhone), allow direct volume control via slider
+                                Slider(value: Binding(
+                                    get: { systemVolumeMonitor.systemVolume },
+                                    set: { newValue in
+                                        // Clamp to ceiling if one is set
+                                        let clampedValue = min(newValue, systemVolumeMonitor.systemVolumeCeiling)
+                                        systemVolumeMonitor.setSystemVolume(clampedValue)
+                                    }
+                                ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
+                                    .accentColor(.blue)
+                                    .onChange(of: systemVolumeMonitor.systemVolume) { oldValue, newValue in
+                                        print("System volume changed to: \(Int(newValue * 100))%")
+                                    }
+                            } else {
+                                // On iPadOS, show read-only display (volume controlled via physical buttons)
+                                Slider(value: Binding(
+                                    get: { systemVolumeMonitor.systemVolume },
+                                    set: { _ in }
+                                ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
+                                    .accentColor(.gray)
+                                    .disabled(true)
+                                Text("Use physical volume buttons to change")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 4)
+                            }
                         }
                         .padding()
                         .background(Color.blue.opacity(0.1))
@@ -162,9 +183,15 @@ struct ContentView: View {
                         VStack(spacing: 8) {
                             Text("Safety Ceiling: \(Int(systemVolumeMonitor.systemVolumeCeiling * 100))%")
                                 .font(.headline)
-                            Text("(Maximum allowed iPad volume - enforced automatically)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            if systemVolumeMonitor.isRunningOniPad {
+                                Text("(Maximum allowed iPad volume - enforced automatically when exceeded)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("(Maximum allowed iPhone volume - enforced automatically)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                             Slider(value: $systemVolumeMonitor.systemVolumeCeiling, in: 0.1...1.0)
                                 .accentColor(.orange)
                                 .onChange(of: systemVolumeMonitor.systemVolumeCeiling) { oldValue, newValue in

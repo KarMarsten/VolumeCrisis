@@ -5,8 +5,8 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ## 🌟 Features
 
 ### 🎛️ Volume Management
-- **Direct System Volume Control** - Control iPad system volume directly from the app (affects all apps including YouTube, Music, etc.)
-- **System Volume Safety Ceiling** - Enforce maximum iPad system volume for safety (works system-wide, automatically enforced)
+- **Direct System Volume Control** - Control system volume directly from the app (iOS: full control via slider, iPadOS: monitoring only - use physical buttons)
+- **System Volume Safety Ceiling** - Enforce maximum system volume for safety (works system-wide, automatically enforced on both iOS and iPadOS)
 - **App Volume Ceiling** - Set maximum volume limits for app's test sound
 - **Smart Volume Constraints** - Volume automatically adjusts when ceiling is reduced
 - **Test Sound Playback** - Custom sine wave tone that respects volume settings
@@ -62,14 +62,18 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### First Time Setup
 1. **Select a User** - Choose from existing users or create a new profile
-2. **Set System Volume Safety Ceiling** - Establish maximum allowed iPad volume (enforced system-wide)
-3. **Adjust System Volume** - Use the system volume slider to set your preferred iPad volume
+2. **Set System Volume Safety Ceiling** - Establish maximum allowed system volume (enforced system-wide)
+3. **Adjust System Volume** - 
+   - **iOS (iPhone)**: Use the system volume slider to set your preferred volume
+   - **iPadOS (iPad)**: Use physical volume buttons, then the app will enforce the safety ceiling
 4. **Set App Volume Ceiling** - Establish maximum volume limit for app's test sound
 5. **Create Presets** - Add volume presets for different scenarios
 6. **Enable Reminders** - Turn on volume check notifications
 
 ### Daily Usage
-- **Control System Volume** - Use the blue system volume slider to adjust iPad volume (works for all apps)
+- **Control System Volume** - 
+  - **iOS**: Use the blue system volume slider to adjust volume (works for all apps)
+  - **iPadOS**: Use physical volume buttons to change volume, app monitors and enforces ceiling
 - **Adjust App Volume** - Use the app volume slider to set test sound volume
 - **Quick Presets** - Tap preset buttons for instant volume changes
 - **Edit Presets** - Tap the pencil icon to modify preset name or volume
@@ -78,8 +82,10 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Stay Aware** - Respond to volume reminder notifications
 
 ### Volume Controls
-- **System Volume Slider** - Blue slider to directly control iPad system volume (affects all apps, limited by ceiling)
-- **System Volume Safety Ceiling** - Orange slider to set maximum allowed iPad system volume (enforced automatically)
+- **System Volume Slider** - 
+  - **iOS**: Blue slider to directly control iPhone system volume (affects all apps, limited by ceiling)
+  - **iPadOS**: Gray read-only display showing current volume (use physical buttons to change)
+- **System Volume Safety Ceiling** - Orange slider to set maximum allowed system volume (enforced automatically on both platforms)
 - **App Volume Slider** - Controls app's test sound volume (0-100%)
 - **App Volume Ceiling** - Red slider sets maximum allowed app volume
 - **Preset Buttons** - Quick access to saved volume levels (tap to apply)
@@ -91,10 +97,10 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### Core Components
 - **AudioManager** - Handles audio playback and volume control for app's test sound
-- **SystemVolumeMonitor** - Monitors system volume, enforces safety ceiling, and manages background execution
-- **UserManager** - Manages user profiles and settings
-- **ContentView** - Main UI and user interactions
-- **UserProfile** - Data model for user information
+- **SystemVolumeMonitor** - Monitors system volume, enforces safety ceiling, manages background execution, and detects iOS vs iPadOS
+- **UserManager** - Manages user profiles, presets, and settings with persistent storage
+- **ContentView** - Main UI and user interactions with platform-specific controls
+- **UserProfile** - Data model for user information and volume presets
 
 ### Key Features
 - **@Published Properties** - Real-time UI updates
@@ -167,7 +173,7 @@ We welcome contributions! Here's how you can help:
 - Test sound uses custom tone generation (system sounds don't respect volume settings)
 - App volume controls only affect the app's test sound
 - System volume control and ceiling enforcement require app to be running (foreground or background)
-- Presets are stored in memory (will reset when app is closed)
+- **iPadOS Limitation**: System volume cannot be increased programmatically - use physical volume buttons. The app can only reduce volume to enforce the safety ceiling.
 - Background execution requires device sound to be on (volume > 0)
 
 ## 🔋 Battery Usage
@@ -182,7 +188,7 @@ The app is optimized for battery efficiency:
 ## 🚧 Future Enhancements
 
 - [x] System volume control and safety ceiling (implemented)
-- [ ] Persistent data storage for presets
+- [x] Persistent data storage for presets and settings (implemented)
 - [ ] Cloud sync for user profiles
 - [ ] Advanced audio analysis
 - [ ] Custom notification sounds
