@@ -80,15 +80,81 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private func setupAudioSession() {
         do {
             audioSession = AVAudioSession.sharedInstance()
-            try audioSession?.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try audioSession?.setActive(true)
-            print("Audio session configured for background playback")
+            
+            // Configure audio session with proper options for background execution
+            // Use .playback category with .mixWithOthers to allow background audio
+            try audioSession?.setCategory(.playback, mode: .default, options: [.mixWithOthers, .duckOthers])
+            
+            // Activate the session
+            try audioSession?.setActive(true, options: [])
+            print("✅ Audio session configured for background playback")
+            
+            // Add notification observers for audio session interruptions
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleAudioSessionInterruption),
+                name: AVAudioSession.interruptionNotification,
+                object: audioSession
+            )
+            
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleAudioSessionRouteChange),
+                name: AVAudioSession.routeChangeNotification,
+                object: audioSession
+            )
+            
         } catch {
-            print("Failed to configure audio session: \(error.localizedDescription)")
+            print("❌ Failed to configure audio session: \(error.localizedDescription)")
+            // Retry after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.setupAudioSession()
+            }
         }
         
         // Setup MPVolumeView for system volume control
         setupVolumeControl()
+    }
+    
+    @objc private func handleAudioSessionInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            print("⚠️ Audio session interruption began")
+        case .ended:
+            print("✅ Audio session interruption ended")
+            // Reactivate audio session
+            do {
+                try audioSession?.setActive(true, options: [])
+                // Restart background audio if needed
+                if isDeviceSoundOn && backgroundEngine == nil {
+                    startBackgroundAudio()
+                }
+            } catch {
+                print("❌ Failed to reactivate audio session: \(error.localizedDescription)")
+            }
+        @unknown default:
+            break
+        }
+    }
+    
+    @objc private func handleAudioSessionRouteChange(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        print("📊 Audio route changed: \(reason)")
+        // Re-check volume after route change
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.checkVolume()
+        }
     }
     
     private func setupVolumeControl() {
@@ -595,6 +661,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: format)
         
         do {
+            // Ensure audio session is active before starting engine
+            try audioSession?.setActive(true, options: [])
+            
             try audioEngine.start()
             playerNode.volume = 0.0 // Silent
             playerNode.play()
@@ -602,9 +671,18 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Schedule buffer to loop continuously
             // Use a weak capture to avoid retain cycles
             func scheduleBuffer() {
+                // Check if engine is still running before scheduling
+                guard let engine = self.backgroundEngine, engine.isRunning else {
+                    print("⚠️ Background audio engine stopped, cannot schedule buffer")
+                    return
+                }
+                
                 playerNode.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
                     // Reschedule when buffer finishes to create infinite loop
-                    guard let self = self, self.backgroundEngine != nil else { return }
+                    guard let self = self, let engine = self.backgroundEngine, engine.isRunning else {
+                        print("⚠️ Background audio stopped, not rescheduling")
+                        return
+                    }
                     scheduleBuffer()
                 }
             }
@@ -614,9 +692,16 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             self.backgroundEngine = audioEngine
             self.backgroundPlayerNode = playerNode
             
-            print("Background audio started - app will run in background")
+            print("✅ Background audio started - app will run in background")
         } catch {
-            print("Failed to start background audio: \(error.localizedDescription)")
+            print("❌ Failed to start background audio: \(error.localizedDescription)")
+            // Retry after a delay if it's an XPC or session issue
+            if error.localizedDescription.contains("XPC") || error.localizedDescription.contains("interrupted") {
+                print("⚠️ Retrying background audio setup after interruption...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    self?.startBackgroundAudio()
+                }
+            }
         }
     }
     
