@@ -308,11 +308,17 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                         }
                     } else {
                         // On iPadOS, if trying to increase volume, it won't work
+                        // Check if we're actually trying to increase from the original system volume
+                        // (not from actualVolume which might be different due to timing/slider issues)
+                        let originalVolume = self.systemVolume
+                        let isActuallyIncreasing = clampedVolume > originalVolume
+                        
                         if clampedVolume > actualVolume {
-                            // Only warn if there's a significant difference (> 5%)
-                            // Small differences are likely just rounding/timing issues
+                            // Only warn if:
+                            // 1. We're actually trying to increase from original volume (not just a timing issue)
+                            // 2. The difference is significant (> 8% to avoid false positives on older devices)
                             let difference = clampedVolume - actualVolume
-                            if difference > 0.05 {
+                            if isActuallyIncreasing && difference > 0.08 {
                                 print("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.")
                             }
                             // Keep UI at requested value for visual feedback, but note it didn't work
