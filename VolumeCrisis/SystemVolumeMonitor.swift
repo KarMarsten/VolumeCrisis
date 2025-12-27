@@ -733,6 +733,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     // Test function to verify slider functionality
+    // Run asynchronously to avoid blocking main thread
     func testSliderFunctionality() {
         guard let slider = volumeSlider else {
             print("❌ TEST FAILED: No volume slider available")
@@ -740,53 +741,80 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             return
         }
         
-        let currentVolume = AVAudioSession.sharedInstance().outputVolume
-        let testVolume = max(0.1, currentVolume - 0.05) // Reduce by 5% for test
-        
-        print("🧪 Testing slider functionality...")
-        print("   Current system volume: \(Int(currentVolume * 100))%")
-        print("   Test target: \(Int(testVolume * 100))%")
-        
-        let originalSliderValue = slider.value
-        slider.value = testVolume
-        slider.sendActions(for: .valueChanged)
-        
-        // Check after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // Run test asynchronously to avoid blocking
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            let newVolume = AVAudioSession.sharedInstance().outputVolume
-            let sliderValue = slider.value
             
-            print("🧪 Test results:")
-            print("   Slider value: \(Int(sliderValue * 100))%")
-            print("   Actual system volume: \(Int(newVolume * 100))%")
+            let currentVolume = AVAudioSession.sharedInstance().outputVolume
+            // Test by reducing volume slightly (only if we can reduce)
+            // Don't test if volume is already very low
+            guard currentVolume > 0.15 else {
+                print("🧪 TEST SKIPPED: Volume too low to test safely")
+                self.sliderStatus = "Found (volume too low to test)"
+                return
+            }
             
-            if abs(newVolume - testVolume) < 0.05 {
-                print("✅ TEST PASSED: Slider is functional")
-                self.sliderStatus = "Found and TESTED - WORKING"
-            } else if abs(newVolume - currentVolume) < 0.02 {
-                print("❌ TEST FAILED: Slider value changed but system volume did not")
-                print("   This indicates the slider is found but not functional on this device")
-                self.sliderStatus = "Found but NOT FUNCTIONAL (test failed)"
-            } else {
-                print("⚠️ TEST INCONCLUSIVE: Volume changed but not to target")
-                self.sliderStatus = "Found but PARTIALLY FUNCTIONAL"
+            let testVolume = max(0.1, currentVolume - 0.05) // Reduce by 5% for test
+            
+            print("🧪 Testing slider functionality...")
+            print("   Current system volume: \(Int(currentVolume * 100))%")
+            print("   Test target: \(Int(testVolume * 100))%")
+            
+            let originalSliderValue = slider.value
+            slider.value = testVolume
+            slider.sendActions(for: .valueChanged)
+            
+            // Check after a delay - use background queue to avoid blocking
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let self = self else { return }
+                let newVolume = AVAudioSession.sharedInstance().outputVolume
+                let sliderValue = slider.value
+                
+                print("🧪 Test results:")
+                print("   Slider value: \(Int(sliderValue * 100))%")
+                print("   Actual system volume: \(Int(newVolume * 100))%")
+                print("   Expected: \(Int(testVolume * 100))%")
+                
+                // Check if volume actually changed from original
+                let volumeChanged = abs(newVolume - currentVolume) > 0.02
+                // Check if it's close to target (within 5%)
+                let closeToTarget = abs(newVolume - testVolume) < 0.05
+                
+                if closeToTarget {
+                    print("✅ TEST PASSED: Slider is functional - volume changed to target")
+                    self.sliderStatus = "Found and TESTED - WORKING"
+                } else if volumeChanged {
+                    print("⚠️ TEST PARTIAL: Slider changed volume but not to exact target")
+                    print("   This may indicate partial functionality on this device")
+                    self.sliderStatus = "Found but PARTIALLY FUNCTIONAL"
+                } else {
+                    print("❌ TEST FAILED: Slider value changed but system volume did not")
+                    print("   This indicates the slider is found but not functional on this device")
+                    self.sliderStatus = "Found but NOT FUNCTIONAL (test failed)"
+                }
             }
         }
     }
     
     // Manual test function for debugging
+    // Run asynchronously to avoid blocking main thread
     func forceEnforcementTest() {
-        let currentVolume = AVAudioSession.sharedInstance().outputVolume
-        print("🧪 FORCE TEST: Current volume = \(Int(currentVolume * 100))%")
-        print("🧪 FORCE TEST: Ceiling = \(Int(systemVolumeCeiling * 100))%")
-        print("🧪 FORCE TEST: Slider available = \(volumeSlider != nil)")
-        
-        if currentVolume > systemVolumeCeiling {
-            print("🧪 FORCE TEST: Volume exceeds ceiling, attempting enforcement...")
-            setSystemVolume(systemVolumeCeiling)
-        } else {
-            print("🧪 FORCE TEST: Volume does not exceed ceiling")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let currentVolume = AVAudioSession.sharedInstance().outputVolume
+            print("🧪 FORCE TEST: Current volume = \(Int(currentVolume * 100))%")
+            print("🧪 FORCE TEST: Ceiling = \(Int(self.systemVolumeCeiling * 100))%")
+            print("🧪 FORCE TEST: Slider available = \(self.volumeSlider != nil)")
+            print("🧪 FORCE TEST: Slider status = \(self.sliderStatus)")
+            
+            if currentVolume > self.systemVolumeCeiling {
+                print("🧪 FORCE TEST: Volume exceeds ceiling, attempting enforcement...")
+                self.setSystemVolume(self.systemVolumeCeiling)
+            } else {
+                print("🧪 FORCE TEST: Volume does not exceed ceiling")
+                print("🧪 FORCE TEST: To test enforcement, increase volume above ceiling first")
+            }
         }
     }
     
