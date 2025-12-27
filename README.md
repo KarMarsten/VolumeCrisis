@@ -14,6 +14,7 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Multiple User Support** - Create and switch between different user profiles
 - **Personalized Settings** - Each user has their own volume preferences and presets
 - **Volume Presets** - Save and quickly access favorite volume levels for different scenarios
+- **Edit & Delete Presets** - Modify preset names/volumes or remove unwanted presets
 
 ### 📱 Smart Features
 - **Background Execution** - App runs continuously in the background when device sound is on
@@ -66,13 +67,17 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 ### Daily Usage
 - **Adjust Volume** - Use the main slider to set your preferred volume
 - **Quick Presets** - Tap preset buttons for instant volume changes
+- **Edit Presets** - Tap the pencil icon to modify preset name or volume
+- **Delete Presets** - Tap the trash icon to remove unwanted presets
 - **Monitor Levels** - Check the volume guide for recommended levels
 - **Stay Aware** - Respond to volume reminder notifications
 
 ### Volume Controls
 - **Main Slider** - Controls app volume (0-100%)
 - **Ceiling Slider** - Sets maximum allowed volume
-- **Preset Buttons** - Quick access to saved volume levels
+- **Preset Buttons** - Quick access to saved volume levels (tap to apply)
+- **Edit Button** - Pencil icon next to each preset to modify it
+- **Delete Button** - Trash icon next to each preset to remove it
 - **Test Sound** - Verify volume settings with custom tone
 
 ## 🏗️ Architecture

@@ -7,8 +7,6 @@ struct ContentView: View {
     @State private var showPresetSheet = false
     @State private var showEditPresetSheet = false
     @State private var editingPreset: VolumePreset?
-    @State private var showVolumeBarPrompt = false
-    @State private var promptVolume: Float = 0.5
 
     var body: some View {
         NavigationView {
@@ -126,41 +124,30 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 8)
 
-                // Interactive Volume Bar Prompt
-                if showVolumeBarPrompt {
-                    InteractiveVolumeBar(volume: $promptVolume, ceiling: audioManager.volumeCeiling) { newVolume in
-                        audioManager.volume = newVolume
-                        showVolumeBarPrompt = false
-                        print("Volume changed to: \(Int(newVolume * 100))%")
-                    } onCancel: {
-                        showVolumeBarPrompt = false
-                    }
-                    .padding()
-                } else {
-                    VStack(spacing: 8) {
-                        Text("App Volume: \(Int(audioManager.volume * 100))%")
-                            .font(.headline)
-                        Text("(This controls the test sound only)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Slider(value: $audioManager.volume, in: 0...audioManager.volumeCeiling)
-                            .accentColor(.blue)
-                            .onChange(of: audioManager.volume) { oldValue, newValue in
-                                // Ensure volume doesn't exceed ceiling
-                                if newValue > audioManager.volumeCeiling {
-                                    audioManager.volume = audioManager.volumeCeiling
-                                }
-                                print("App volume changed to: \(Int(audioManager.volume * 100))%")
+                // Volume Control Section
+                VStack(spacing: 8) {
+                    Text("App Volume: \(Int(audioManager.volume * 100))%")
+                        .font(.headline)
+                    Text("(This controls the test sound only)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Slider(value: $audioManager.volume, in: 0...audioManager.volumeCeiling)
+                        .accentColor(.blue)
+                        .onChange(of: audioManager.volume) { oldValue, newValue in
+                            // Ensure volume doesn't exceed ceiling
+                            if newValue > audioManager.volumeCeiling {
+                                audioManager.volume = audioManager.volumeCeiling
                             }
-                            .onChange(of: audioManager.volumeCeiling) { oldValue, newCeiling in
-                                // If ceiling is reduced below current volume, adjust volume
-                                if audioManager.volume > newCeiling {
-                                    audioManager.volume = newCeiling
-                                }
+                            print("App volume changed to: \(Int(audioManager.volume * 100))%")
+                        }
+                        .onChange(of: audioManager.volumeCeiling) { oldValue, newCeiling in
+                            // If ceiling is reduced below current volume, adjust volume
+                            if audioManager.volume > newCeiling {
+                                audioManager.volume = newCeiling
                             }
-                    }
-                    .padding()
+                        }
                 }
+                .padding()
 
                 VStack(spacing: 8) {
                     Text("Ceiling: \(Int(audioManager.volumeCeiling * 100))%")
@@ -176,28 +163,23 @@ struct ContentView: View {
                 }
                 .padding()
 
-                Button("Play Test Sound") {
-                    audioManager.playSound(named: "test")
+                HStack(spacing: 16) {
+                    Button("Play Test Sound") {
+                        audioManager.playSound(named: "test")
+                    }
+                    .foregroundColor(.green)
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
+                    
+                    Button("Stop Test Sound") {
+                        audioManager.stopSound()
+                    }
+                    .foregroundColor(.red)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
                 }
-                .padding()
-                
-                Button("Test Volume Change") {
-                    // Test volume change
-                    audioManager.volume = 0.2
-                    print("Testing volume change to 20%")
-                }
-                .foregroundColor(.blue)
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
-                
-                Button("Stop Test Sound") {
-                    audioManager.stopSound()
-                }
-                .foregroundColor(.red)
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
 
                 Spacer()
                     .frame(height: 20)
@@ -215,93 +197,6 @@ struct ContentView: View {
                     EditPresetView(userManager: userManager, preset: preset)
                 }
             }
-        }
-    }
-}
-
-// Interactive Volume Bar Prompt
-struct InteractiveVolumeBar: View {
-    @Binding var volume: Float
-    let ceiling: Float
-    let onSet: (Float) -> Void
-    let onCancel: () -> Void
-    @State private var willReset = false
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("Set Your App Volume")
-                .font(.headline)
-            Text("(Controls test sound volume)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            HStack {
-                Text("Low")
-                    .foregroundColor(.blue)
-                Spacer()
-                Text("Medium")
-                    .foregroundColor(.green)
-                Spacer()
-                Text("High")
-                    .foregroundColor(.orange)
-                Spacer()
-                Text("Max")
-                    .foregroundColor(.red)
-            }
-            .font(.caption)
-            ZStack(alignment: .leading) {
-                GeometryReader { geo in
-                    Capsule()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 16)
-                    Capsule()
-                        .fill(barColor(for: volume))
-                        .frame(width: CGFloat(volume/ceiling) * geo.size.width, height: 16)
-                }
-                .frame(height: 16)
-                Slider(value: $volume, in: 0...ceiling)
-                    .opacity(0.01)
-            }
-            .frame(height: 24)
-            Text("Current: \(Int(volume * 100))%")
-                .font(.subheadline)
-            HStack {
-                Button("Cancel") {
-                    onCancel()
-                }
-                Spacer()
-                Button("Set Volume") {
-                    let selectedVolume = volume
-                    let percent = selectedVolume / ceiling
-                    
-                    // Check if volume is in High or Max range
-                    if percent >= 0.6 {
-                        willReset = true
-                        // Set to medium (60%) after 1 second
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            onSet(0.6)
-                        }
-                    } else {
-                        onSet(selectedVolume)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemBackground)).shadow(radius: 8))
-        .padding()
-    }
-
-    func barColor(for value: Float) -> Color {
-        let percent = value / ceiling
-        switch percent {
-        case ..<0.2:
-            return .blue
-        case 0.2..<0.6:
-            return .green
-        case 0.6..<0.9:
-            return .orange
-        default:
-            return .red
         }
     }
 }
