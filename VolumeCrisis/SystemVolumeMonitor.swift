@@ -143,11 +143,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         if isRunningOniPad {
             if clampedVolume > systemVolume {
                 // Trying to increase volume on iPadOS - this won't work
-                // Silently return - UI slider is disabled so this shouldn't be called from UI
+                // This should only happen from UI (which is disabled), so silently return
                 return
             }
             // On iPadOS, we CAN reduce volume to enforce ceiling
             // This is the key functionality for ceiling enforcement
+            print("iPadOS: Enforcing ceiling - reducing volume from \(Int(systemVolume * 100))% to \(Int(clampedVolume * 100))%")
         }
         
         // Set flag to prevent checkVolume from overriding our change
@@ -160,18 +161,22 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             guard let self = self else { return }
             
             // Ensure slider is available
+            // This is critical for ceiling enforcement on iPadOS
             if self.volumeSlider == nil {
-                print("Warning: Volume slider not found, attempting to setup...")
+                print("⚠️ Warning: Volume slider not found, attempting to setup...")
                 // Retry setup if slider not found
                 self.setupVolumeControl()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                     guard let self = self else { return }
                     if let slider = self.volumeSlider {
                         slider.value = clampedVolume
                         slider.sendActions(for: .valueChanged)
-                        print("Volume set after retry to: \(Int(clampedVolume * 100))%")
+                        print("✅ Volume set after retry to: \(Int(clampedVolume * 100))%")
                     } else {
-                        print("Error: Volume slider still not found after retry. Volume control may be limited.")
+                        print("❌ Error: Volume slider still not found after retry. Ceiling enforcement may not work.")
+                        if self.isRunningOniPad {
+                            print("⚠️ iPadOS: Without volume slider, ceiling enforcement will not work. App may need to be restarted.")
+                        }
                         #if targetEnvironment(simulator)
                         print("Note: System volume control may not work in iOS Simulator. Try on a physical device.")
                         #endif
