@@ -36,7 +36,7 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### Prerequisites
 - Xcode 14.0 or later
-- iOS 16.0 or later
+- iOS 18.5 or later
 - macOS 13.0 or later (for development)
 
 ### Installation
@@ -136,9 +136,9 @@ We welcome contributions! Here's how you can help:
 
 ## 📱 Supported Devices
 
-- iPhone (iOS 16.0+)
-- iPad (iOS 16.0+)
-- iPod touch (iOS 16.0+)
+- iPhone (iOS 18.5+)
+- iPad (iPadOS 18.5+)
+- iPod touch (iOS 18.5+)
 
 ## 🔒 Privacy & Permissions
 
