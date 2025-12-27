@@ -458,12 +458,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Verify the reduction worked after a delay
             // On iPadOS, we may need multiple attempts to reduce volume
+            // Use more aggressive verification on iPadOS
             var verificationAttempt = 0
-            let maxVerificationAttempts = isRunningOniPad ? 5 : 3
+            let maxVerificationAttempts = isRunningOniPad ? 10 : 3  // More attempts on iPadOS
             
             func verifyAndRetry() {
                 verificationAttempt += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                // Use shorter delay on iPadOS for faster response
+                let delay = isRunningOniPad ? 0.3 : 0.5
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self = self else { return }
                     if let updatedVolume = self.audioSession?.outputVolume {
                         if updatedVolume > self.systemVolumeCeiling {
