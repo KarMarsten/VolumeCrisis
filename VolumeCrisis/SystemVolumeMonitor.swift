@@ -51,9 +51,19 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         startMonitoring()
         
         // Ensure volume slider is set up early - critical for iPadOS ceiling enforcement
-        // Give it a moment for the window to be available
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // On older devices, give more time for window to be available
+        let delay = isRunningOniPad ? 1.0 : 0.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             self?.setupVolumeControl()
+            // On older iPads, also retry after a longer delay as backup
+            if self?.isRunningOniPad == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    if self?.volumeSlider == nil {
+                        print("⚠️ Retrying volume slider setup for older iPad...")
+                        self?.setupVolumeControl()
+                    }
+                }
+            }
         }
     }
     
