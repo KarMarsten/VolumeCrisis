@@ -157,12 +157,21 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Ensure slider is available
             if self.volumeSlider == nil {
+                print("Warning: Volume slider not found, attempting to setup...")
                 // Retry setup if slider not found
                 self.setupVolumeControl()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                    self?.volumeSlider?.value = clampedVolume
-                    // Trigger value changed event to ensure volume actually changes
-                    self?.volumeSlider?.sendActions(for: .valueChanged)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self else { return }
+                    if let slider = self.volumeSlider {
+                        slider.value = clampedVolume
+                        slider.sendActions(for: .valueChanged)
+                        print("Volume set after retry to: \(Int(clampedVolume * 100))%")
+                    } else {
+                        print("Error: Volume slider still not found after retry. Volume control may be limited.")
+                        #if targetEnvironment(simulator)
+                        print("Note: System volume control may not work in iOS Simulator. Try on a physical device.")
+                        #endif
+                    }
                 }
                 return
             }
@@ -190,18 +199,42 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 
                 if let updatedVolume = self.audioSession?.outputVolume {
                     let actualVolume = updatedVolume
-                    // Only update if the change actually took effect, or if we're on iOS
-                    if self.canControlSystemVolume || abs(actualVolume - clampedVolume) < 0.05 {
-                        self.systemVolume = actualVolume
-                        print("Actual system volume after change: \(Int(actualVolume * 100))%")
+                    
+                    if self.canControlSystemVolume {
+                        // On iOS, check if volume change took effect
+                        if abs(actualVolume - clampedVolume) < 0.05 {
+                            // Volume change succeeded
+                            self.systemVolume = actualVolume
+                            print("iOS: Volume successfully changed to: \(Int(actualVolume * 100))%")
+                        } else {
+                            // Volume change didn't work - might be simulator limitation
+                            #if targetEnvironment(simulator)
+                            print("iOS Simulator: Volume control may not work in simulator. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
+                            print("Note: System volume control works better on physical devices.")
+                            // Keep UI at requested value since simulator limitations
+                            self.systemVolume = clampedVolume
+                            #else
+                            print("iOS: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
+                            print("Note: If volume slider is not found, volume control may be limited.")
+                            // Still update to actual volume to reflect reality
+                            self.systemVolume = actualVolume
+                            #endif
+                        }
                     } else {
-                        // On iPadOS, if volume didn't change, keep our UI value
-                        print("iPadOS: Volume change did not take effect. Keeping UI at: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%")
-                        // Don't update systemVolume - keep it at what user set
-                    }
-                    if abs(actualVolume - clampedVolume) > 0.05 {
-                        print("Warning: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
-                        print("Note: On iPadOS, apps may have limited ability to change system volume programmatically.")
+                        // On iPadOS, if trying to increase volume, it won't work
+                        if clampedVolume > actualVolume {
+                            // User tried to increase volume - this won't work on iPadOS
+                            print("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.")
+                            // Keep UI at requested value for visual feedback, but note it didn't work
+                            // The actual system volume will be updated when user uses physical buttons
+                        } else if clampedVolume < actualVolume {
+                            // User tried to decrease volume - this should work (enforcing ceiling)
+                            self.systemVolume = actualVolume
+                            print("iPadOS: Volume reduced to: \(Int(actualVolume * 100))% (enforcing ceiling)")
+                        } else {
+                            // Volume is the same - no change needed
+                            self.systemVolume = actualVolume
+                        }
                     }
                 }
             }

@@ -166,11 +166,21 @@ struct ContentView: View {
                                 // On iPadOS, show read-only display (volume controlled via physical buttons)
                                 Slider(value: Binding(
                                     get: { systemVolumeMonitor.systemVolume },
-                                    set: { _ in }
+                                    set: { newValue in
+                                        // On iPadOS, we can only reduce volume (enforce ceiling), not increase
+                                        // If user tries to increase, show that it won't work
+                                        if newValue > systemVolumeMonitor.systemVolume {
+                                            // Can't increase on iPadOS - just show current value
+                                            print("iPadOS: Cannot increase volume via slider. Use physical volume buttons.")
+                                        } else {
+                                            // Can reduce to enforce ceiling
+                                            let clampedValue = min(newValue, systemVolumeMonitor.systemVolumeCeiling)
+                                            systemVolumeMonitor.setSystemVolume(clampedValue)
+                                        }
+                                    }
                                 ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
                                     .accentColor(.gray)
-                                    .disabled(true)
-                                Text("Use physical volume buttons to change")
+                                Text("Use physical volume buttons to change. App will enforce safety ceiling.")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                     .padding(.top, 4)
