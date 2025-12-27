@@ -44,6 +44,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private var isSettingVolume: Bool = false
     private var lastVolumeSetAttempt: Date?
     
+    // Diagnostic properties
+    @Published var sliderStatus: String = "Unknown"
+    @Published var lastEnforcementAttempt: String = "Never"
+    @Published var enforcementSuccessCount: Int = 0
+    @Published var enforcementFailureCount: Int = 0
+    
     private override init() {
         super.init()
         loadSystemVolumeCeiling()
@@ -211,6 +217,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             let maxAttempts = self.isRunningOniPad ? 30 : 20
             func findSlider(attempt: Int = 0) {
                 guard attempt < maxAttempts else {
+                    self.sliderStatus = "NOT FOUND after \(maxAttempts) attempts"
                     print("⚠️ Error: Could not find system volume slider after \(maxAttempts) attempts")
                     if self.isRunningOniPad {
                         print("⚠️ iPadOS: This may be an older device compatibility issue. Try restarting the app.")
@@ -558,9 +565,11 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                                     verifyAndRetry()
                                 }
                             } else {
+                                self.enforcementFailureCount += 1
                                 print("❌ FAILED to enforce ceiling after \(maxVerificationAttempts) attempts.")
                                 print("❌ Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
                                 print("❌ Volume slider status: \(self.volumeSlider == nil ? "NOT AVAILABLE" : "AVAILABLE")")
+                                print("📊 Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)")
                                 if self.isRunningOniPad {
                                     print("⚠️ iPadOS: This indicates a critical issue with volume control.")
                                     print("⚠️ Possible solutions:")
@@ -572,7 +581,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                         } else {
                             // Successfully enforced ceiling
                             self.systemVolume = updatedVolume
+                            self.enforcementSuccessCount += 1
                             print("✅ Ceiling enforced successfully after \(verificationAttempt) attempt(s). Volume: \(Int(updatedVolume * 100))%")
+                            print("📊 Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)")
                         }
                     } else {
                         print("⚠️ Warning: Could not read updated volume from audio session")

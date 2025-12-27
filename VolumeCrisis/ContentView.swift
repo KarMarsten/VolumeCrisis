@@ -195,6 +195,29 @@ struct ContentView: View {
                                     .font(.caption2)
                                     .foregroundColor(.orange)
                                     .padding(.top, 2)
+                                
+                                // Diagnostic info for iPadOS
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Diagnostics:")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                    Text("Slider: \(systemVolumeMonitor.sliderStatus)")
+                                        .font(.caption2)
+                                        .foregroundColor(systemVolumeMonitor.volumeSlider == nil ? .red : .green)
+                                    Text("Last enforcement: \(systemVolumeMonitor.lastEnforcementAttempt)")
+                                        .font(.caption2)
+                                    Text("Success: \(systemVolumeMonitor.enforcementSuccessCount), Failures: \(systemVolumeMonitor.enforcementFailureCount)")
+                                        .font(.caption2)
+                                    Button("Test Enforcement") {
+                                        systemVolumeMonitor.forceEnforcementTest()
+                                    }
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                                }
+                                .padding(.top, 4)
+                                .padding(.horizontal, 8)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(4)
                             } else {
                                 Text("(Maximum allowed iPhone volume - enforced automatically)")
                                     .font(.caption)
