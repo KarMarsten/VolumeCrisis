@@ -248,8 +248,11 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 
                 if let volumeView = self.volumeView, let slider = searchSubviews(volumeView, depth: 0) {
                     self.volumeSlider = slider
+                    self.sliderStatus = "Found (attempt \(attempt + 1))"
                     print("✅ System volume slider found and ready (attempt \(attempt + 1))")
                     print("Current slider value: \(Int(slider.value * 100))%")
+                    // Test if slider is functional
+                    self.testSliderFunctionality()
                     return
                 }
                 
