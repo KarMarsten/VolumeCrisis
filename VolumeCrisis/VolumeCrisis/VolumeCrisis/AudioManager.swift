@@ -7,14 +7,48 @@ class AudioManager: ObservableObject {
     private var player: AVAudioPlayer?
     private var audioEngine: AVAudioEngine?
     private var audioPlayerNode: AVAudioPlayerNode?
+    
+    private let volumeKey = "savedAppVolume"
+    private let volumeCeilingKey = "savedAppVolumeCeiling"
+    
     @Published var volume: Float = 0.5 {
         didSet {
             player?.volume = min(volume, volumeCeiling)
             audioPlayerNode?.volume = min(volume, volumeCeiling)
+            saveVolume()
         }
     }
-    @Published var volumeCeiling: Float = 1.0
+    @Published var volumeCeiling: Float = 1.0 {
+        didSet {
+            saveVolumeCeiling()
+        }
+    }
     @Published var isPlaying: Bool = false
+    
+    private init() {
+        loadVolume()
+        loadVolumeCeiling()
+    }
+    
+    private func saveVolume() {
+        UserDefaults.standard.set(volume, forKey: volumeKey)
+    }
+    
+    private func loadVolume() {
+        if UserDefaults.standard.object(forKey: volumeKey) != nil {
+            volume = UserDefaults.standard.float(forKey: volumeKey)
+        }
+    }
+    
+    private func saveVolumeCeiling() {
+        UserDefaults.standard.set(volumeCeiling, forKey: volumeCeilingKey)
+    }
+    
+    private func loadVolumeCeiling() {
+        if UserDefaults.standard.object(forKey: volumeCeilingKey) != nil {
+            volumeCeiling = UserDefaults.standard.float(forKey: volumeCeilingKey)
+        }
+    }
 
     func playSound(named name: String) {
         print("Attempting to play sound: \(name)")

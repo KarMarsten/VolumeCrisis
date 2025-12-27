@@ -8,12 +8,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     @Published var isDeviceSoundOn: Bool = true
     @Published var systemVolume: Float = 0.0
+    private let systemVolumeCeilingKey = "savedSystemVolumeCeiling"
+    
     @Published var systemVolumeCeiling: Float = 1.0 {
         didSet {
             // Enforce ceiling immediately if current volume exceeds it
             if systemVolume > systemVolumeCeiling {
                 setSystemVolume(systemVolumeCeiling)
             }
+            saveSystemVolumeCeiling()
         }
     }
     
@@ -27,8 +30,19 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        loadSystemVolumeCeiling()
         setupAudioSession()
         startMonitoring()
+    }
+    
+    private func saveSystemVolumeCeiling() {
+        UserDefaults.standard.set(systemVolumeCeiling, forKey: systemVolumeCeilingKey)
+    }
+    
+    private func loadSystemVolumeCeiling() {
+        if UserDefaults.standard.object(forKey: systemVolumeCeilingKey) != nil {
+            systemVolumeCeiling = UserDefaults.standard.float(forKey: systemVolumeCeilingKey)
+        }
     }
     
     private func setupAudioSession() {
