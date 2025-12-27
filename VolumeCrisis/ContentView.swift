@@ -197,16 +197,21 @@ struct ContentView: View {
                                     .padding(.top, 2)
                                 
                                 // Diagnostic info for iPadOS
+                                let sliderAvailable = systemVolumeMonitor.isSliderAvailable
+                                let sliderColor: Color = sliderAvailable ? .green : .red
+                                
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Diagnostics:")
                                         .font(.caption2)
                                         .fontWeight(.bold)
                                     Text("Slider: \(systemVolumeMonitor.sliderStatus)")
                                         .font(.caption2)
-                                        .foregroundColor(systemVolumeMonitor.volumeSlider == nil ? .red : .green)
+                                        .foregroundColor(sliderColor)
                                     Text("Last enforcement: \(systemVolumeMonitor.lastEnforcementAttempt)")
                                         .font(.caption2)
-                                    Text("Success: \(systemVolumeMonitor.enforcementSuccessCount), Failures: \(systemVolumeMonitor.enforcementFailureCount)")
+                                    let successCount = systemVolumeMonitor.enforcementSuccessCount
+                                    let failureCount = systemVolumeMonitor.enforcementFailureCount
+                                    Text("Success: \(successCount), Failures: \(failureCount)")
                                         .font(.caption2)
                                     Button("Test Enforcement") {
                                         systemVolumeMonitor.forceEnforcementTest()

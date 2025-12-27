@@ -35,6 +35,11 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private var volumeView: MPVolumeView?
     private var volumeSlider: UISlider?
     
+    // Public property to check if slider is available (for UI diagnostics)
+    var isSliderAvailable: Bool {
+        return volumeSlider != nil
+    }
+    
     private var audioSession: AVAudioSession?
     private var monitoringTimer: Timer?
     private var backgroundEngine: AVAudioEngine?
