@@ -1,11 +1,24 @@
 import Foundation
 import AVFoundation
+import MediaPlayer
+import UIKit
 
 class SystemVolumeMonitor: NSObject, ObservableObject {
     static let shared = SystemVolumeMonitor()
     
     @Published var isDeviceSoundOn: Bool = true
     @Published var systemVolume: Float = 0.0
+    @Published var systemVolumeCeiling: Float = 1.0 {
+        didSet {
+            // Enforce ceiling immediately if current volume exceeds it
+            if systemVolume > systemVolumeCeiling {
+                setSystemVolume(systemVolumeCeiling)
+            }
+        }
+    }
+    
+    private var volumeView: MPVolumeView?
+    private var volumeSlider: UISlider?
     
     private var audioSession: AVAudioSession?
     private var monitoringTimer: Timer?
@@ -26,6 +39,54 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             print("Audio session configured for background playback")
         } catch {
             print("Failed to configure audio session: \(error.localizedDescription)")
+        }
+        
+        // Setup MPVolumeView for system volume control
+        setupVolumeControl()
+    }
+    
+    private func setupVolumeControl() {
+        // Create hidden MPVolumeView to access the system volume slider
+        // Note: MPVolumeView must be added to a view hierarchy to work
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.volumeView = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
+            self.volumeView?.isHidden = true
+            
+            // Add to window so it's in the view hierarchy (required for MPVolumeView to work)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                window.addSubview(self.volumeView!)
+            }
+            
+            // Find the volume slider in the MPVolumeView
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                for subview in self.volumeView?.subviews ?? [] {
+                    if let slider = subview as? UISlider {
+                        self.volumeSlider = slider
+                        print("System volume slider found and ready")
+                        break
+                    }
+                }
+            }
+        }
+    }
+    
+    func setSystemVolume(_ volume: Float) {
+        let clampedVolume = max(0.0, min(1.0, volume))
+        
+        // Use MPVolumeView slider to set system volume
+        DispatchQueue.main.async { [weak self] in
+            if let slider = self?.volumeSlider {
+                slider.value = clampedVolume
+                print("System volume set to: \(Int(clampedVolume * 100))%")
+            } else {
+                // Retry setup if slider not found
+                self?.setupVolumeControl()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self?.volumeSlider?.value = clampedVolume
+                }
+            }
         }
     }
     
@@ -63,6 +124,19 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private func checkVolume() {
         let newVolume = AVAudioSession.sharedInstance().outputVolume
         let wasSoundOn = isDeviceSoundOn
+        
+        // Enforce volume ceiling - if volume exceeds ceiling, reduce it
+        if newVolume > systemVolumeCeiling {
+            print("System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), reducing...")
+            setSystemVolume(systemVolumeCeiling)
+            // Wait a moment for the volume to update, then check again
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                if let updatedVolume = self?.audioSession?.outputVolume {
+                    self?.systemVolume = updatedVolume
+                }
+            }
+            return
+        }
         
         systemVolume = newVolume
         isDeviceSoundOn = newVolume > 0.0

@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var audioManager = AudioManager.shared
     @StateObject var userManager = UserManager()
+    @StateObject var systemVolumeMonitor = SystemVolumeMonitor.shared
     @State private var showUserSheet = false
     @State private var showPresetSheet = false
     @State private var showEditPresetSheet = false
@@ -124,7 +125,45 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 8)
 
-                // Volume Control Section
+                // System Volume Safety Ceiling Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("System Volume Safety")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Current System Volume: \(Int(systemVolumeMonitor.systemVolume * 100))%")
+                                .font(.subheadline)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        VStack(spacing: 8) {
+                            Text("Safety Ceiling: \(Int(systemVolumeMonitor.systemVolumeCeiling * 100))%")
+                                .font(.headline)
+                            Text("(Maximum allowed iPad volume - enforced automatically)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Slider(value: $systemVolumeMonitor.systemVolumeCeiling, in: 0.1...1.0)
+                                .accentColor(.orange)
+                                .onChange(of: systemVolumeMonitor.systemVolumeCeiling) { oldValue, newValue in
+                                    // If current volume exceeds new ceiling, reduce it
+                                    if systemVolumeMonitor.systemVolume > newValue {
+                                        systemVolumeMonitor.setSystemVolume(newValue)
+                                    }
+                                    print("System volume ceiling changed to: \(Int(newValue * 100))%")
+                                }
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 8)
+
+                // App Volume Control Section
                 VStack(spacing: 8) {
                     Text("App Volume: \(Int(audioManager.volume * 100))%")
                         .font(.headline)
