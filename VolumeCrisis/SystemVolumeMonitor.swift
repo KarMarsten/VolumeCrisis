@@ -312,13 +312,30 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         let wasSoundOn = isDeviceSoundOn
         
         // Enforce volume ceiling - if volume exceeds ceiling, reduce it
+        // This is critical functionality - must work on both iOS and iPadOS
         if newVolume > systemVolumeCeiling {
-            print("System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), reducing...")
+            print("⚠️ System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), enforcing ceiling...")
+            
+            // Update UI immediately to show we're enforcing
+            systemVolume = systemVolumeCeiling
+            
+            // Reduce volume to ceiling
+            // On iPadOS, this will work because we're reducing (not increasing)
             setSystemVolume(systemVolumeCeiling)
-            // Wait a moment for the volume to update, then check again
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                if let updatedVolume = self?.audioSession?.outputVolume {
-                    self?.systemVolume = updatedVolume
+            
+            // Verify the reduction worked after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                if let updatedVolume = self.audioSession?.outputVolume {
+                    if updatedVolume > self.systemVolumeCeiling {
+                        // Volume still exceeds ceiling - retry enforcement
+                        print("⚠️ Volume still exceeds ceiling after reduction attempt. Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...")
+                        self.setSystemVolume(self.systemVolumeCeiling)
+                    } else {
+                        // Successfully enforced ceiling
+                        self.systemVolume = updatedVolume
+                        print("✅ Ceiling enforced successfully. Volume: \(Int(updatedVolume * 100))%")
+                    }
                 }
             }
             return
