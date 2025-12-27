@@ -380,11 +380,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         // Create a silent audio loop to keep the app running in background
         // This is CRITICAL for ceiling enforcement when app is in background
         // Always start background audio to ensure app stays active for monitoring
-        guard backgroundEngine == nil else {
+        if let existingEngine = backgroundEngine {
             // Already running, but verify it's still active
-            if backgroundEngine?.isRunning == false {
+            if existingEngine.isRunning == false {
                 print("Background audio stopped unexpectedly - restarting...")
                 stopBackgroundAudio()
+                // Continue to start new background audio below
             } else {
                 return // Already running
             }
