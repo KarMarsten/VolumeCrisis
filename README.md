@@ -1,4 +1,4 @@
-# VolumeCrisis THIS IS A TEST
+# VolumeCrisis
 
 A SwiftUI iOS app to control in-app audio volume, set volume ceilings, manage user profiles and presets.
 
