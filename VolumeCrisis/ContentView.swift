@@ -164,22 +164,16 @@ struct ContentView: View {
                                     }
                             } else {
                                 // On iPadOS, show read-only display (volume controlled via physical buttons)
+                                // Slider is disabled - user must use physical buttons
                                 Slider(value: Binding(
                                     get: { systemVolumeMonitor.systemVolume },
-                                    set: { newValue in
-                                        // On iPadOS, we can only reduce volume (enforce ceiling), not increase
-                                        // If user tries to increase, show that it won't work
-                                        if newValue > systemVolumeMonitor.systemVolume {
-                                            // Can't increase on iPadOS - just show current value
-                                            print("iPadOS: Cannot increase volume via slider. Use physical volume buttons.")
-                                        } else {
-                                            // Can reduce to enforce ceiling
-                                            let clampedValue = min(newValue, systemVolumeMonitor.systemVolumeCeiling)
-                                            systemVolumeMonitor.setSystemVolume(clampedValue)
-                                        }
+                                    set: { _ in
+                                        // No-op: Slider is read-only on iPadOS
+                                        // Volume can only be changed via physical buttons
                                     }
                                 ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
                                     .accentColor(.gray)
+                                    .disabled(true)
                                 Text("Use physical volume buttons to change. App will enforce safety ceiling.")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)

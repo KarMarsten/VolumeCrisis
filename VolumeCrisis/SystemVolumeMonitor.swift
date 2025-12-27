@@ -142,8 +142,8 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         // On iOS, we can attempt to set volume directly
         if isRunningOniPad && clampedVolume > systemVolume {
             // On iPadOS, we can only reduce volume, not increase it
-            print("iPadOS: Can only reduce volume, not increase. Current: \(Int(systemVolume * 100))%, Requested: \(Int(clampedVolume * 100))%")
-            print("iPadOS: Cannot increase volume programmatically. Use physical buttons.")
+            // Silently return - UI slider is disabled so this shouldn't be called from UI
+            // Only called when enforcing ceiling (reducing volume)
             return
         }
         
