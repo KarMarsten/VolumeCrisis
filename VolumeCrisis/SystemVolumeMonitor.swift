@@ -230,10 +230,23 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 
                 func retryVolumeSet() {
                     guard retryCount < maxRetries else {
-                        print("❌ Error: Volume slider still not found after \(maxRetries) retries. Ceiling enforcement may not work.")
+                        print("❌ CRITICAL ERROR: Volume slider still not found after \(maxRetries) retries.")
+                        print("❌ Ceiling enforcement CANNOT work without the volume slider.")
                         if self.isRunningOniPad {
-                            print("⚠️ iPadOS: Without volume slider, ceiling enforcement will not work. Try restarting the app.")
+                            print("⚠️ iPadOS: This is a critical failure. Ceiling enforcement will not work.")
+                            print("⚠️ Possible causes:")
+                            print("   - MPVolumeView not properly initialized")
+                            print("   - Window not available")
+                            print("   - Older iPad compatibility issue")
+                            print("⚠️ Try: Restart the app, ensure app is in foreground at least once")
                         }
+                        // Log the current state for debugging
+                        print("📊 Debug Info:")
+                        print("   - Volume slider: \(self.volumeSlider == nil ? "NOT FOUND" : "FOUND")")
+                        print("   - Volume view: \(self.volumeView == nil ? "nil" : "exists")")
+                        print("   - Current volume: \(Int(self.systemVolume * 100))%")
+                        print("   - Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
+                        print("   - Is iPad: \(self.isRunningOniPad)")
                         return
                     }
                     
@@ -418,12 +431,34 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                             // Volume still exceeds ceiling - retry enforcement
                             if verificationAttempt < maxVerificationAttempts {
                                 print("⚠️ Volume still exceeds ceiling after attempt \(verificationAttempt). Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...")
-                                self.setSystemVolume(self.systemVolumeCeiling)
-                                verifyAndRetry()
+                                
+                                // Check if slider is still available
+                                if self.volumeSlider == nil {
+                                    print("❌ Volume slider lost during enforcement! Re-initializing...")
+                                    self.setupVolumeControl()
+                                    // Wait and retry
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        if self.volumeSlider != nil {
+                                            self.setSystemVolume(self.systemVolumeCeiling)
+                                            verifyAndRetry()
+                                        } else {
+                                            print("❌ CRITICAL: Cannot enforce ceiling - volume slider unavailable")
+                                        }
+                                    }
+                                } else {
+                                    self.setSystemVolume(self.systemVolumeCeiling)
+                                    verifyAndRetry()
+                                }
                             } else {
-                                print("❌ Failed to enforce ceiling after \(maxVerificationAttempts) attempts. Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
+                                print("❌ FAILED to enforce ceiling after \(maxVerificationAttempts) attempts.")
+                                print("❌ Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
+                                print("❌ Volume slider status: \(self.volumeSlider == nil ? "NOT AVAILABLE" : "AVAILABLE")")
                                 if self.isRunningOniPad {
-                                    print("⚠️ iPadOS: Volume slider may not be available. Try restarting the app.")
+                                    print("⚠️ iPadOS: This indicates a critical issue with volume control.")
+                                    print("⚠️ Possible solutions:")
+                                    print("   1. Restart the app")
+                                    print("   2. Ensure app was in foreground at least once")
+                                    print("   3. Check if MPVolumeView is properly initialized")
                                 }
                             }
                         } else {
@@ -431,6 +466,8 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                             self.systemVolume = updatedVolume
                             print("✅ Ceiling enforced successfully after \(verificationAttempt) attempt(s). Volume: \(Int(updatedVolume * 100))%")
                         }
+                    } else {
+                        print("⚠️ Warning: Could not read updated volume from audio session")
                     }
                 }
             }
