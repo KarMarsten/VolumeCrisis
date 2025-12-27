@@ -18,9 +18,10 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - **Edit & Delete Presets** - Modify preset names/volumes or remove unwanted presets
 
 ### 📱 Smart Features
-- **Background Execution** - App runs continuously in the background when device sound is on
-- **System Volume Monitoring** - Automatically detects when device volume changes
-- **System Volume Enforcement** - Automatically reduces system volume if it exceeds the safety ceiling
+- **Background Execution** - App runs continuously in the background to monitor and enforce volume limits
+- **System Volume Monitoring** - Automatically detects when device volume changes (from any app or physical buttons)
+- **System Volume Enforcement** - Automatically reduces system volume if it exceeds the safety ceiling, even when changed from other apps
+- **Cross-App Protection** - Ceiling enforcement works when volume is changed from YouTube, Music, or any other app
 - **Volume Reminders** - Hourly notifications to check your volume levels
 - **Volume Guide Cards** - Recommended volume levels for different content types:
   - YouTube (60%) - Video content
@@ -72,14 +73,16 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 ### Daily Usage
 - **Control System Volume** - 
-  - **iOS**: Use the blue system volume slider to adjust volume (works for all apps)
-  - **iPadOS**: Use physical volume buttons to change volume, app monitors and enforces ceiling
+  - **iOS**: Use the blue system volume slider to adjust volume (works for all apps, respects ceiling)
+  - **iPadOS**: Use physical volume buttons to change volume, app automatically enforces ceiling within 2 seconds
+- **Set Safety Ceiling** - Adjust the orange ceiling slider to set your maximum allowed volume (works on both iOS and iPadOS)
 - **Adjust App Volume** - Use the app volume slider to set test sound volume
 - **Quick Presets** - Tap preset buttons for instant volume changes
 - **Edit Presets** - Tap the pencil icon to modify preset name or volume
 - **Delete Presets** - Tap the trash icon to remove unwanted presets
 - **Monitor Levels** - Check the volume guide for recommended levels
 - **Stay Aware** - Respond to volume reminder notifications
+- **Cross-App Protection** - The app automatically enforces your ceiling even when using other apps like YouTube, Music, etc.
 
 ### Volume Controls
 - **System Volume Slider** - 
@@ -117,11 +120,12 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 - Proper audio session management
 - Background audio session for continuous execution
 - System volume monitoring via AVAudioSession KVO (event-driven, battery efficient)
-- Direct system volume control via MPVolumeView (controls actual iPad volume)
+- Direct system volume control via MPVolumeView (works on iOS, limited on iPadOS)
 - System volume safety ceiling enforcement (automatically reduces volume when exceeded)
-- Real-time system volume monitoring and enforcement
-- Silent audio loop to maintain background execution when device sound is on
-- Optimized for battery life: 1-second audio buffers and 5-second volume check intervals
+- Real-time system volume monitoring and enforcement across all apps
+- Silent audio loop to maintain background execution for continuous monitoring
+- Optimized for battery life: 1-second audio buffers and 2-second volume check intervals
+- Priority-based ceiling enforcement (bypasses other operations to ensure safety)
 
 ### Data Management
 - In-memory user profiles and presets
@@ -174,15 +178,15 @@ We welcome contributions! Here's how you can help:
 - App volume controls only affect the app's test sound
 - System volume control and ceiling enforcement require app to be running (foreground or background)
 - **iPadOS Limitation**: System volume cannot be increased programmatically - use physical volume buttons. The app can only reduce volume to enforce the safety ceiling.
-- Background execution requires device sound to be on (volume > 0)
+- **iOS Simulator Limitation**: System volume control may not work properly in the iOS Simulator. For full functionality, test on a physical device.
 
 ## 🔋 Battery Usage
 
 The app is optimized for battery efficiency:
 - **Event-driven monitoring**: Uses KVO (Key-Value Observing) for real-time volume changes instead of constant polling
-- **Reduced timer frequency**: Volume checks run every 5 seconds as a backup (KVO handles most changes)
+- **Efficient backup checks**: Volume checks run every 2 seconds as a backup (KVO handles most changes)
 - **Optimized audio buffers**: 1-second silent buffers reduce CPU wake-ups by 90%
-- **Automatic power management**: Background audio stops when device is muted, saving battery
+- **Continuous background execution**: App stays active to monitor volume changes from other apps
 - **Low overhead**: Minimal battery impact when running in background
 
 ## 🚧 Future Enhancements
