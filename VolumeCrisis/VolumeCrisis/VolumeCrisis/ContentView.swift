@@ -5,8 +5,8 @@ struct ContentView: View {
     @StateObject var userManager = UserManager()
     @State private var showUserSheet = false
     @State private var showPresetSheet = false
-    @State private var showVolumeGuide = false
-    @State private var selectedScenario = ""
+    @State private var showEditPresetSheet = false
+    @State private var editingPreset: VolumePreset?
     @State private var showVolumeBarPrompt = false
     @State private var promptVolume: Float = 0.5
 
@@ -52,10 +52,32 @@ struct ContentView: View {
                         ScrollView(showsIndicators: true) {
                             LazyVStack(spacing: 8) {
                                 ForEach(selectedUser.presets) { preset in
-                                    Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
-                                        audioManager.volume = preset.volume
+                                    HStack {
+                                        Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
+                                            audioManager.volume = preset.volume
+                                        }
+                                        .foregroundColor(.blue)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Button(action: {
+                                            if let user = userManager.selectedUser {
+                                                showEditPresetSheet = true
+                                                editingPreset = preset
+                                            }
+                                        }) {
+                                            Image(systemName: "pencil")
+                                                .foregroundColor(.orange)
+                                        }
+                                        
+                                        Button(action: {
+                                            if let user = userManager.selectedUser {
+                                                userManager.deletePreset(from: user, preset: preset)
+                                            }
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
                                     }
-                                    .foregroundColor(.blue)
                                     .padding(.horizontal)
                                     .padding(.vertical, 4)
                                 }
@@ -187,6 +209,11 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showPresetSheet) {
                 AddPresetView(userManager: userManager)
+            }
+            .sheet(isPresented: $showEditPresetSheet) {
+                if let preset = editingPreset {
+                    EditPresetView(userManager: userManager, preset: preset)
+                }
             }
         }
     }
@@ -355,6 +382,58 @@ struct AddPresetView: View {
                 presentationMode.wrappedValue.dismiss()
             }
             .disabled(presetName.isEmpty)
+            Spacer()
+        }
+        .padding()
+    }
+}
+
+struct EditPresetView: View {
+    @ObservedObject var userManager: UserManager
+    @Environment(\.presentationMode) var presentationMode
+    let preset: VolumePreset
+    @State private var presetName: String = ""
+    @State private var presetVolume: Float = 0.5
+    
+    init(userManager: UserManager, preset: VolumePreset) {
+        self.userManager = userManager
+        self.preset = preset
+        _presetName = State(initialValue: preset.name)
+        _presetVolume = State(initialValue: preset.volume)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Edit Preset")
+                .font(.headline)
+            TextField("Preset Name", text: $presetName)
+            HStack {
+                Text("Volume: \(Int(presetVolume * 100))%")
+                Slider(value: $presetVolume, in: 0...1)
+            }
+            HStack(spacing: 16) {
+                Button("Delete") {
+                    if let user = userManager.selectedUser {
+                        userManager.deletePreset(from: user, preset: preset)
+                    }
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .foregroundColor(.red)
+                
+                Spacer()
+                
+                Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
+                }
+                
+                Button("Save") {
+                    if let user = userManager.selectedUser {
+                        userManager.updatePreset(for: user, presetId: preset.id, newName: presetName, newVolume: presetVolume)
+                    }
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .disabled(presetName.isEmpty)
+            }
             Spacer()
         }
         .padding()

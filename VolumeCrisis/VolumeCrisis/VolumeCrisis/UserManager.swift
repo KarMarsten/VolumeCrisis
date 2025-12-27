@@ -47,6 +47,36 @@ class UserManager: ObservableObject {
         selectedUser = user
     }
     
+    func deletePreset(from user: UserProfile, preset: VolumePreset) {
+        guard let userIndex = users.firstIndex(where: { $0.id == user.id }) else {
+            print("User not found")
+            return
+        }
+        
+        users[userIndex].presets.removeAll { $0.id == preset.id }
+        
+        // Update selectedUser if it's the same user
+        if selectedUser?.id == user.id {
+            selectedUser = users[userIndex]
+        }
+    }
+    
+    func updatePreset(for user: UserProfile, presetId: UUID, newName: String, newVolume: Float) {
+        guard let userIndex = users.firstIndex(where: { $0.id == user.id }) else {
+            print("User not found")
+            return
+        }
+        
+        if let presetIndex = users[userIndex].presets.firstIndex(where: { $0.id == presetId }) {
+            users[userIndex].presets[presetIndex] = VolumePreset(id: presetId, name: newName, volume: newVolume)
+            
+            // Update selectedUser if it's the same user
+            if selectedUser?.id == user.id {
+                selectedUser = users[userIndex]
+            }
+        }
+    }
+    
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             DispatchQueue.main.async {
