@@ -138,6 +138,10 @@ struct ContentView: View {
                             Text("(Controls actual iPad volume - affects all apps)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                            Text("Note: System volume control may be limited on iPadOS. Use physical volume buttons if the slider doesn't respond.")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                                .padding(.top, 4)
                             Slider(value: Binding(
                                 get: { systemVolumeMonitor.systemVolume },
                                 set: { newValue in

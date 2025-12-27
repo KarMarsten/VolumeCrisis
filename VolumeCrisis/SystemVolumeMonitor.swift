@@ -139,14 +139,31 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
             
             // Set the volume value
-            self.volumeSlider?.value = clampedVolume
-            // Trigger value changed event to ensure the change takes effect
-            self.volumeSlider?.sendActions(for: .valueChanged)
+            guard let slider = self.volumeSlider else {
+                print("Error: Volume slider is nil")
+                return
+            }
             
-            // Update our tracked volume after a brief delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            let currentSliderValue = slider.value
+            print("Setting system volume slider to: \(Int(clampedVolume * 100))% (current slider: \(Int(currentSliderValue * 100))%)")
+            
+            slider.value = clampedVolume
+            // Trigger value changed event to ensure the change takes effect
+            slider.sendActions(for: .valueChanged)
+            
+            // Update our tracked volume immediately for UI responsiveness
+            self.systemVolume = clampedVolume
+            
+            // Update our tracked volume after a brief delay to get actual system volume
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 if let updatedVolume = self?.audioSession?.outputVolume {
-                    self?.systemVolume = updatedVolume
+                    let actualVolume = updatedVolume
+                    self?.systemVolume = actualVolume
+                    print("Actual system volume after change: \(Int(actualVolume * 100))%")
+                    if abs(actualVolume - clampedVolume) > 0.05 {
+                        print("Warning: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
+                        print("Note: On iPadOS, apps may have limited ability to change system volume programmatically.")
+                    }
                 }
             }
             
