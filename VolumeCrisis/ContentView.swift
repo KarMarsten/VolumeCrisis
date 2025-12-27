@@ -207,7 +207,14 @@ struct ContentView: View {
                                             .font(.caption2)
                                         Spacer()
                                     }
-                                    .foregroundColor(systemVolumeMonitor.isSliderAvailable ? .green : .red)
+                                    .foregroundColor(systemVolumeMonitor.isSliderFunctional ? .green : .orange)
+                                    
+                                    if !systemVolumeMonitor.isSliderFunctional && systemVolumeMonitor.sliderStatus.contains("NOT FUNCTIONAL") {
+                                        Text("⚠️ Ceiling enforcement disabled on this device")
+                                            .font(.caption2)
+                                            .foregroundColor(.red)
+                                            .padding(.top, 2)
+                                    }
                                     
                                     Text("Last enforcement: \(systemVolumeMonitor.lastEnforcementAttempt)")
                                         .font(.caption2)

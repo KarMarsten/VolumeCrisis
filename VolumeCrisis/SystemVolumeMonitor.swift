@@ -54,6 +54,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     @Published var lastEnforcementAttempt: String = "Never"
     @Published var enforcementSuccessCount: Int = 0
     @Published var enforcementFailureCount: Int = 0
+    @Published var isSliderFunctional: Bool = false  // Track if slider actually works
     
     private override init() {
         super.init()
