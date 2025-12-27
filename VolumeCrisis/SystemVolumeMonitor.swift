@@ -40,6 +40,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private var backgroundEngine: AVAudioEngine?
     private var backgroundPlayerNode: AVAudioPlayerNode?
     
+    // Flag to prevent checkVolume from overriding user-initiated volume changes
+    private var isSettingVolume: Bool = false
+    private var lastVolumeSetAttempt: Date?
+    
     private override init() {
         super.init()
         loadSystemVolumeCeiling()
@@ -143,6 +147,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             return
         }
         
+        // Set flag to prevent checkVolume from overriding our change
+        isSettingVolume = true
+        lastVolumeSetAttempt = Date()
+        
         // Use MPVolumeView slider to set system volume
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -176,11 +184,21 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             self.systemVolume = clampedVolume
             
             // Update our tracked volume after a brief delay to get actual system volume
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                if let updatedVolume = self?.audioSession?.outputVolume {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                self.isSettingVolume = false
+                
+                if let updatedVolume = self.audioSession?.outputVolume {
                     let actualVolume = updatedVolume
-                    self?.systemVolume = actualVolume
-                    print("Actual system volume after change: \(Int(actualVolume * 100))%")
+                    // Only update if the change actually took effect, or if we're on iOS
+                    if self.canControlSystemVolume || abs(actualVolume - clampedVolume) < 0.05 {
+                        self.systemVolume = actualVolume
+                        print("Actual system volume after change: \(Int(actualVolume * 100))%")
+                    } else {
+                        // On iPadOS, if volume didn't change, keep our UI value
+                        print("iPadOS: Volume change did not take effect. Keeping UI at: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%")
+                        // Don't update systemVolume - keep it at what user set
+                    }
                     if abs(actualVolume - clampedVolume) > 0.05 {
                         print("Warning: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
                         print("Note: On iPadOS, apps may have limited ability to change system volume programmatically.")
@@ -224,6 +242,17 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     private func checkVolume() {
+        // Don't override volume if we're actively setting it
+        if isSettingVolume {
+            // Check if enough time has passed since last volume set attempt
+            if let lastAttempt = lastVolumeSetAttempt, Date().timeIntervalSince(lastAttempt) < 1.0 {
+                return // Still within the grace period
+            } else {
+                // Grace period expired, reset flag
+                isSettingVolume = false
+            }
+        }
+        
         let newVolume = AVAudioSession.sharedInstance().outputVolume
         let wasSoundOn = isDeviceSoundOn
         
@@ -240,7 +269,22 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             return
         }
         
-        systemVolume = newVolume
+        // Only update systemVolume if we're not actively setting it
+        // On iOS, always update to reflect actual system volume
+        // On iPadOS, only update if the actual volume changed significantly (user used physical buttons)
+        if !isSettingVolume {
+            if canControlSystemVolume {
+                // On iOS, always sync with actual volume
+                systemVolume = newVolume
+            } else {
+                // On iPadOS, only update if volume changed significantly (user used physical buttons)
+                if abs(newVolume - systemVolume) > 0.02 {
+                    systemVolume = newVolume
+                    print("iPadOS: System volume changed via physical buttons to: \(Int(newVolume * 100))%")
+                }
+            }
+        }
+        
         isDeviceSoundOn = newVolume > 0.0
         
         // If sound just turned on, start background audio
