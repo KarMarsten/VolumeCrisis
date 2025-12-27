@@ -786,14 +786,18 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 if closeToTarget {
                     print("✅ TEST PASSED: Slider is functional - volume changed to target")
                     self.sliderStatus = "Found and TESTED - WORKING"
+                    self.isSliderFunctional = true
                 } else if volumeChanged {
                     print("⚠️ TEST PARTIAL: Slider changed volume but not to exact target")
                     print("   This may indicate partial functionality on this device")
                     self.sliderStatus = "Found but PARTIALLY FUNCTIONAL"
+                    self.isSliderFunctional = true  // Still functional, just not precise
                 } else {
                     print("❌ TEST FAILED: Slider value changed but system volume did not")
                     print("   This indicates the slider is found but not functional on this device")
-                    self.sliderStatus = "Found but NOT FUNCTIONAL (test failed)"
+                    print("   ⚠️ CRITICAL: Ceiling enforcement will NOT work on this device")
+                    self.sliderStatus = "Found but NOT FUNCTIONAL - Ceiling enforcement disabled"
+                    self.isSliderFunctional = false
                 }
             }
         }
