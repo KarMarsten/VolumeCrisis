@@ -49,6 +49,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         loadSystemVolumeCeiling()
         setupAudioSession()
         startMonitoring()
+        
+        // Ensure volume slider is set up early - critical for iPadOS ceiling enforcement
+        // Give it a moment for the window to be available
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.setupVolumeControl()
+        }
     }
     
     private func saveSystemVolumeCeiling() {
