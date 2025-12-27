@@ -191,19 +191,26 @@ struct ContentView: View {
                                 Text("(Maximum allowed iPad volume - enforced automatically when exceeded)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                                Text("Adjust this slider to set your maximum volume limit")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                                    .padding(.top, 2)
                             } else {
                                 Text("(Maximum allowed iPhone volume - enforced automatically)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+                            // Ceiling slider - fully adjustable on all platforms
                             Slider(value: $systemVolumeMonitor.systemVolumeCeiling, in: 0.1...1.0)
                                 .accentColor(.orange)
                                 .onChange(of: systemVolumeMonitor.systemVolumeCeiling) { oldValue, newValue in
+                                    print("System volume ceiling changed from \(Int(oldValue * 100))% to \(Int(newValue * 100))%")
+                                    
                                     // If current volume exceeds new ceiling, reduce it
                                     if systemVolumeMonitor.systemVolume > newValue {
+                                        print("Current volume (\(Int(systemVolumeMonitor.systemVolume * 100))%) exceeds new ceiling (\(Int(newValue * 100))%), reducing volume...")
                                         systemVolumeMonitor.setSystemVolume(newValue)
                                     }
-                                    print("System volume ceiling changed to: \(Int(newValue * 100))%")
                                 }
                         }
                         .padding()

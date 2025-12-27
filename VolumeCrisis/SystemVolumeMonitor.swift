@@ -138,13 +138,16 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     func setSystemVolume(_ volume: Float) {
         let clampedVolume = max(0.0, min(1.0, volume))
         
-        // On iPadOS, system volume control is limited - only enforce ceiling (reduce volume)
-        // On iOS, we can attempt to set volume directly
-        if isRunningOniPad && clampedVolume > systemVolume {
-            // On iPadOS, we can only reduce volume, not increase it
-            // Silently return - UI slider is disabled so this shouldn't be called from UI
-            // Only called when enforcing ceiling (reducing volume)
-            return
+        // On iPadOS, we can only reduce volume (enforce ceiling), not increase it
+        // On iOS, we can set volume in both directions
+        if isRunningOniPad {
+            if clampedVolume > systemVolume {
+                // Trying to increase volume on iPadOS - this won't work
+                // Silently return - UI slider is disabled so this shouldn't be called from UI
+                return
+            }
+            // On iPadOS, we CAN reduce volume to enforce ceiling
+            // This is the key functionality for ceiling enforcement
         }
         
         // Set flag to prevent checkVolume from overriding our change
@@ -178,12 +181,29 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Set the volume value
             guard let slider = self.volumeSlider else {
-                print("Error: Volume slider is nil")
+                print("Error: Volume slider is nil - attempting to find it...")
+                // Try to setup volume control again
+                self.setupVolumeControl()
+                // Retry after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self, let slider = self.volumeSlider else {
+                        print("Error: Volume slider still not found. Ceiling enforcement may be limited.")
+                        return
+                    }
+                    slider.value = clampedVolume
+                    slider.sendActions(for: .valueChanged)
+                    print("Volume set after retry to: \(Int(clampedVolume * 100))%")
+                }
                 return
             }
             
             let currentSliderValue = slider.value
             print("Setting system volume slider to: \(Int(clampedVolume * 100))% (current slider: \(Int(currentSliderValue * 100))%)")
+            
+            // On iPadOS, we're reducing volume (enforcing ceiling), so this should work
+            if self.isRunningOniPad {
+                print("iPadOS: Reducing volume to enforce ceiling: \(Int(clampedVolume * 100))%")
+            }
             
             slider.value = clampedVolume
             // Trigger value changed event to ensure the change takes effect
