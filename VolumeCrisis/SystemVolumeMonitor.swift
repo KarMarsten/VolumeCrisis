@@ -173,7 +173,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                     return nil
                 }
                 
-                if let volumeView = self.volumeView, let slider = searchSubviews(volumeView) {
+                if let volumeView = self.volumeView, let slider = searchSubviews(volumeView, depth: 0) {
                     self.volumeSlider = slider
                     print("✅ System volume slider found and ready (attempt \(attempt + 1))")
                     print("Current slider value: \(Int(slider.value * 100))%")
@@ -181,8 +181,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 }
                 
                 // Retry if not found - use longer delay on older devices
+                // Use async to avoid blocking main thread
                 let delay = self.isRunningOniPad ? 0.15 : 0.1
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self = self else { return }
                     findSlider(attempt: attempt + 1)
                 }
             }
