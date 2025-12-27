@@ -190,6 +190,8 @@ The app is optimized for battery efficiency:
 - [ ] Background execution statistics
 - [ ] Configurable background execution behavior
 
+For a detailed roadmap of upcoming features, see [FEATURE_IDEAS.md](FEATURE_IDEAS.md)
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
