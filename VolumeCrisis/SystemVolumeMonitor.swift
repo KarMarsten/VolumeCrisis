@@ -161,27 +161,39 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             guard let self = self else { return }
             
             // Ensure slider is available
-            // This is critical for ceiling enforcement on iPadOS
+            // This is CRITICAL for ceiling enforcement on iPadOS
             if self.volumeSlider == nil {
                 print("⚠️ Warning: Volume slider not found, attempting to setup...")
-                // Retry setup if slider not found
+                // Retry setup if slider not found - this is critical for iPadOS ceiling enforcement
                 self.setupVolumeControl()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                    guard let self = self else { return }
-                    if let slider = self.volumeSlider {
-                        slider.value = clampedVolume
-                        slider.sendActions(for: .valueChanged)
-                        print("✅ Volume set after retry to: \(Int(clampedVolume * 100))%")
-                    } else {
-                        print("❌ Error: Volume slider still not found after retry. Ceiling enforcement may not work.")
+                
+                // On iPadOS, we need the slider for ceiling enforcement - retry more aggressively
+                var retryCount = 0
+                let maxRetries = self.isRunningOniPad ? 5 : 3
+                
+                func retryVolumeSet() {
+                    guard retryCount < maxRetries else {
+                        print("❌ Error: Volume slider still not found after \(maxRetries) retries. Ceiling enforcement may not work.")
                         if self.isRunningOniPad {
-                            print("⚠️ iPadOS: Without volume slider, ceiling enforcement will not work. App may need to be restarted.")
+                            print("⚠️ iPadOS: Without volume slider, ceiling enforcement will not work. Try restarting the app.")
                         }
-                        #if targetEnvironment(simulator)
-                        print("Note: System volume control may not work in iOS Simulator. Try on a physical device.")
-                        #endif
+                        return
+                    }
+                    
+                    retryCount += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryCount) * 0.3) { [weak self] in
+                        guard let self = self else { return }
+                        if let slider = self.volumeSlider {
+                            slider.value = clampedVolume
+                            slider.sendActions(for: .valueChanged)
+                            print("✅ Volume set after retry \(retryCount) to: \(Int(clampedVolume * 100))%")
+                        } else {
+                            // Retry again
+                            retryVolumeSet()
+                        }
                     }
                 }
+                retryVolumeSet()
                 return
             }
             
@@ -250,8 +262,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                     } else {
                         // On iPadOS, if trying to increase volume, it won't work
                         if clampedVolume > actualVolume {
-                            // User tried to increase volume - this won't work on iPadOS
-                            print("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.")
+                            // Only warn if there's a significant difference (> 5%)
+                            // Small differences are likely just rounding/timing issues
+                            let difference = clampedVolume - actualVolume
+                            if difference > 0.05 {
+                                print("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.")
+                            }
                             // Keep UI at requested value for visual feedback, but note it didn't work
                             // The actual system volume will be updated when user uses physical buttons
                         } else if clampedVolume < actualVolume {
@@ -326,20 +342,36 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             setSystemVolume(systemVolumeCeiling)
             
             // Verify the reduction worked after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
-                if let updatedVolume = self.audioSession?.outputVolume {
-                    if updatedVolume > self.systemVolumeCeiling {
-                        // Volume still exceeds ceiling - retry enforcement
-                        print("⚠️ Volume still exceeds ceiling after reduction attempt. Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...")
-                        self.setSystemVolume(self.systemVolumeCeiling)
-                    } else {
-                        // Successfully enforced ceiling
-                        self.systemVolume = updatedVolume
-                        print("✅ Ceiling enforced successfully. Volume: \(Int(updatedVolume * 100))%")
+            // On iPadOS, we may need multiple attempts to reduce volume
+            var verificationAttempt = 0
+            let maxVerificationAttempts = isRunningOniPad ? 5 : 3
+            
+            func verifyAndRetry() {
+                verificationAttempt += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self else { return }
+                    if let updatedVolume = self.audioSession?.outputVolume {
+                        if updatedVolume > self.systemVolumeCeiling {
+                            // Volume still exceeds ceiling - retry enforcement
+                            if verificationAttempt < maxVerificationAttempts {
+                                print("⚠️ Volume still exceeds ceiling after attempt \(verificationAttempt). Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...")
+                                self.setSystemVolume(self.systemVolumeCeiling)
+                                verifyAndRetry()
+                            } else {
+                                print("❌ Failed to enforce ceiling after \(maxVerificationAttempts) attempts. Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
+                                if self.isRunningOniPad {
+                                    print("⚠️ iPadOS: Volume slider may not be available. Try restarting the app.")
+                                }
+                            }
+                        } else {
+                            // Successfully enforced ceiling
+                            self.systemVolume = updatedVolume
+                            print("✅ Ceiling enforced successfully after \(verificationAttempt) attempt(s). Volume: \(Int(updatedVolume * 100))%")
+                        }
                     }
                 }
             }
+            verifyAndRetry()
             return
         }
         
