@@ -84,6 +84,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private func setupVolumeControl() {
         // Create hidden MPVolumeView to access the system volume slider
         // Note: MPVolumeView must be added to a view hierarchy to work
+        // On older iPads, this may take longer or need different handling
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
@@ -95,20 +96,49 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             self.volumeView?.showsVolumeSlider = true
             self.volumeView?.showsRouteButton = false
             
-            // Add to window so it's in the view hierarchy (required for MPVolumeView to work)
+            // Try multiple methods to find window (for compatibility with older iOS versions)
+            var window: UIWindow?
+            
+            // Method 1: Modern window scene approach (iOS 13+)
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
+               let foundWindow = windowScene.windows.first {
+                window = foundWindow
+            }
+            
+            // Method 2: Fallback for older iOS versions
+            if window == nil {
+                if let appDelegate = UIApplication.shared.delegate,
+                   let foundWindow = appDelegate.window {
+                    window = foundWindow
+                }
+            }
+            
+            // Method 3: Direct window access (last resort)
+            if window == nil {
+                window = UIApplication.shared.windows.first
+            }
+            
+            if let window = window {
                 window.addSubview(self.volumeView!)
-                print("MPVolumeView added to window")
+                print("MPVolumeView added to window (method: \(window.description))")
             } else {
-                print("Error: Could not find window to add MPVolumeView")
+                print("⚠️ Error: Could not find window to add MPVolumeView - will retry")
+                // Retry after a delay - sometimes window isn't ready immediately
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    self?.setupVolumeControl()
+                }
+                return
             }
             
             // Find the volume slider in the MPVolumeView
-            // Try multiple times as the slider may not be immediately available
+            // On older iPads, this may take more attempts - increase retry count
+            let maxAttempts = self.isRunningOniPad ? 30 : 20
             func findSlider(attempt: Int = 0) {
-                guard attempt < 20 else {
-                    print("Error: Could not find system volume slider after 20 attempts")
+                guard attempt < maxAttempts else {
+                    print("⚠️ Error: Could not find system volume slider after \(maxAttempts) attempts")
+                    if self.isRunningOniPad {
+                        print("⚠️ iPadOS: This may be an older device compatibility issue. Try restarting the app.")
+                    }
                     return
                 }
                 
@@ -127,13 +157,14 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 
                 if let volumeView = self.volumeView, let slider = searchSubviews(volumeView) {
                     self.volumeSlider = slider
-                    print("System volume slider found and ready (attempt \(attempt + 1))")
+                    print("✅ System volume slider found and ready (attempt \(attempt + 1))")
                     print("Current slider value: \(Int(slider.value * 100))%")
                     return
                 }
                 
-                // Retry if not found
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Retry if not found - use longer delay on older devices
+                let delay = self.isRunningOniPad ? 0.15 : 0.1
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     findSlider(attempt: attempt + 1)
                 }
             }
