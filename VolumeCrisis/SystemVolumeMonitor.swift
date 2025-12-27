@@ -256,8 +256,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                     self.sliderStatus = "Found (attempt \(attempt + 1))"
                     print("✅ System volume slider found and ready (attempt \(attempt + 1))")
                     print("Current slider value: \(Int(slider.value * 100))%")
-                    // Test if slider is functional
-                    self.testSliderFunctionality()
+                    // Test if slider is functional - delay to avoid blocking initialization
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        self?.testSliderFunctionality()
+                    }
                     return
                 }
                 
