@@ -293,9 +293,21 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 print("iPadOS: Reducing volume to enforce ceiling: \(Int(clampedVolume * 100))%")
             }
             
+            // Store original slider value for verification
+            let originalSliderValue = slider.value
+            print("📊 Slider state: Before=\(Int(originalSliderValue * 100))%, Target=\(Int(clampedVolume * 100))%")
+            
             slider.value = clampedVolume
             // Trigger value changed event to ensure the change takes effect
             slider.sendActions(for: .valueChanged)
+            
+            // Verify slider value was actually set
+            let newSliderValue = slider.value
+            if abs(newSliderValue - clampedVolume) > 0.01 {
+                print("⚠️ WARNING: Slider value not set correctly! Expected=\(Int(clampedVolume * 100))%, Got=\(Int(newSliderValue * 100))%")
+            } else {
+                print("✅ Slider value set successfully: \(Int(newSliderValue * 100))%")
+            }
             
             // Update our tracked volume immediately for UI responsiveness
             self.systemVolume = clampedVolume
@@ -372,11 +384,13 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Periodic check as backup - more frequent to catch volume changes from other apps
         // KVO handles most volume changes, but this ensures we catch changes from other apps
-        // Reduced to 2 seconds for better responsiveness, especially for ceiling enforcement
-        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        // On iPadOS, use 1 second intervals for faster detection of volume changes from apps like YouTube Kids
+        let interval = isRunningOniPad ? 1.0 : 2.0
+        monitoringTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.checkVolume()
         }
         RunLoop.main.add(monitoringTimer!, forMode: .common)
+        print("📊 Volume monitoring started: Interval=\(interval)s, KVO=active, Background audio=\(isDeviceSoundOn ? "on" : "off")")
         
         // Always start background audio to keep app running in background
         // This is critical for ceiling enforcement when app is in background
@@ -396,6 +410,11 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private func checkVolume() {
         let newVolume = AVAudioSession.sharedInstance().outputVolume
         let wasSoundOn = isDeviceSoundOn
+        
+        // Log volume changes for debugging (only when significant change or exceeds ceiling)
+        if abs(newVolume - systemVolume) > 0.01 || newVolume > systemVolumeCeiling {
+            print("📊 Volume check: Current=\(Int(newVolume * 100))%, Tracked=\(Int(systemVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%")
+        }
         
         // CRITICAL: Enforce volume ceiling FIRST - this must always work, even if we're setting volume
         // Ceiling enforcement takes priority over everything else for safety
