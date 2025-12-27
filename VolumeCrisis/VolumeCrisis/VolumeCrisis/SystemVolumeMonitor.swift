@@ -223,6 +223,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         monitoringTimer?.invalidate()
         audioSession?.removeObserver(self, forKeyPath: "outputVolume")
         stopBackgroundAudio()
+        // Clean up volume view
+        volumeView?.removeFromSuperview()
+        volumeView = nil
+        volumeSlider = nil
     }
 }
 
