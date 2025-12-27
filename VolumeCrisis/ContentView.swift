@@ -197,22 +197,24 @@ struct ContentView: View {
                                     .padding(.top, 2)
                                 
                                 // Diagnostic info for iPadOS
-                                let sliderAvailable = systemVolumeMonitor.isSliderAvailable
-                                let sliderColor: Color = sliderAvailable ? .green : .red
-                                
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Diagnostics:")
                                         .font(.caption2)
                                         .fontWeight(.bold)
-                                    Text("Slider: \(systemVolumeMonitor.sliderStatus)")
-                                        .font(.caption2)
-                                        .foregroundColor(sliderColor)
+                                    
+                                    HStack {
+                                        Text("Slider: \(systemVolumeMonitor.sliderStatus)")
+                                            .font(.caption2)
+                                        Spacer()
+                                    }
+                                    .foregroundColor(systemVolumeMonitor.isSliderAvailable ? .green : .red)
+                                    
                                     Text("Last enforcement: \(systemVolumeMonitor.lastEnforcementAttempt)")
                                         .font(.caption2)
-                                    let successCount = systemVolumeMonitor.enforcementSuccessCount
-                                    let failureCount = systemVolumeMonitor.enforcementFailureCount
-                                    Text("Success: \(successCount), Failures: \(failureCount)")
+                                    
+                                    Text("Success: \(systemVolumeMonitor.enforcementSuccessCount), Failures: \(systemVolumeMonitor.enforcementFailureCount)")
                                         .font(.caption2)
+                                    
                                     Button("Test Enforcement") {
                                         systemVolumeMonitor.forceEnforcementTest()
                                     }
