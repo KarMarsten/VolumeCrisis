@@ -535,10 +535,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Check if slider is functional - if test showed it's not functional, don't try
             if !isSliderFunctional && sliderStatus.contains("NOT FUNCTIONAL") {
-                print("⚠️ WARNING: Volume slider is not functional on this device")
+                print("⚠️ CRITICAL LIMITATION: Volume slider is not functional on this device")
                 print("⚠️ Ceiling enforcement cannot work - slider found but doesn't control system volume")
-                print("⚠️ This is a device limitation on some older iPads")
+                print("⚠️ This is a hardware/OS limitation on some older iPads")
+                print("⚠️ iOS blocks programmatic volume control on these devices - no workaround available")
                 print("📊 Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%")
+                print("💡 Alternative: Use iOS Settings > Screen Time > Content & Privacy Restrictions > Volume Limit")
                 // Don't attempt enforcement - it won't work
                 return
             }

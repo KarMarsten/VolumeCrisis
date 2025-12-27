@@ -172,13 +172,30 @@ We welcome contributions! Here's how you can help:
 - No personal information is transmitted
 - User profiles and settings remain private
 
-## 🐛 Known Issues
+## 🐛 Known Issues & Limitations
 
 - Test sound uses custom tone generation (system sounds don't respect volume settings)
 - App volume controls only affect the app's test sound
 - System volume control and ceiling enforcement require app to be running (foreground or background)
 - **iPadOS Limitation**: System volume cannot be increased programmatically - use physical volume buttons. The app can only reduce volume to enforce the safety ceiling.
 - **iOS Simulator Limitation**: System volume control may not work properly in the iOS Simulator. For full functionality, test on a physical device.
+- **⚠️ CRITICAL: Older iPad Limitation**: On some older iPad models, programmatic system volume control is completely blocked by the OS. The app can detect this and will show a warning. **Ceiling enforcement will NOT work on these devices.** This is a hardware/OS restriction that cannot be bypassed with public APIs.
+
+### Workarounds for Older iPads
+
+If ceiling enforcement doesn't work on your device, use these iOS system features:
+
+1. **Screen Time Volume Limit** (Recommended):
+   - Settings > Screen Time > Content & Privacy Restrictions
+   - Enable "Content & Privacy Restrictions"
+   - Go to "Volume Limit" and set your maximum volume
+
+2. **iOS Shortcuts**:
+   - Create a shortcut that sets volume to your desired maximum
+   - Run it manually or via automation
+
+3. **Parental Controls**:
+   - Use Family Sharing to set volume limits for child devices
 
 ## 🔋 Battery Usage
 

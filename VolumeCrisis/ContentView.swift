@@ -210,10 +210,20 @@ struct ContentView: View {
                                     .foregroundColor(systemVolumeMonitor.isSliderFunctional ? .green : .orange)
                                     
                                     if !systemVolumeMonitor.isSliderFunctional && systemVolumeMonitor.sliderStatus.contains("NOT FUNCTIONAL") {
-                                        Text("⚠️ Ceiling enforcement disabled on this device")
-                                            .font(.caption2)
-                                            .foregroundColor(.red)
-                                            .padding(.top, 2)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("⚠️ CRITICAL LIMITATION")
+                                                .font(.caption2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.red)
+                                            Text("Ceiling enforcement cannot work on this device. This is a hardware/OS limitation on some older iPads - programmatic volume control is blocked by the system.")
+                                                .font(.caption2)
+                                                .foregroundColor(.orange)
+                                            Text("Alternative: Use iOS Settings > Screen Time > Content & Privacy Restrictions > Volume Limit")
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                                .padding(.top, 2)
+                                        }
+                                        .padding(.top, 2)
                                     }
                                     
                                     Text("Last enforcement: \(systemVolumeMonitor.lastEnforcementAttempt)")
