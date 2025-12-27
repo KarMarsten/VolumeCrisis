@@ -325,12 +325,16 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         }
         
         // Only update systemVolume if we're not actively setting it
-        // On iOS, always update to reflect actual system volume
-        // On iPadOS, only update if the actual volume changed significantly (user used physical buttons)
+        // On both iOS and iPadOS, only sync when volume actually changed significantly
+        // This prevents overriding user-initiated volume changes that are still in progress
         if !isSettingVolume {
             if canControlSystemVolume {
-                // On iOS, always sync with actual volume
-                systemVolume = newVolume
+                // On iOS, only sync if volume changed significantly
+                // This allows programmatic changes to complete before syncing
+                if abs(newVolume - systemVolume) > 0.02 {
+                    systemVolume = newVolume
+                    print("iOS: System volume changed to: \(Int(newVolume * 100))%")
+                }
             } else {
                 // On iPadOS, only update if volume changed significantly (user used physical buttons)
                 if abs(newVolume - systemVolume) > 0.02 {
