@@ -151,6 +151,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         }
         
         // Set flag to prevent checkVolume from overriding our change
+        // Use a longer grace period to ensure volume change completes
         isSettingVolume = true
         lastVolumeSetAttempt = Date()
         
@@ -212,10 +213,14 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Update our tracked volume immediately for UI responsiveness
             self.systemVolume = clampedVolume
             
-            // Update our tracked volume after a brief delay to get actual system volume
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            // Update our tracked volume after a delay to get actual system volume
+            // Use longer delay to ensure volume change completes before allowing checkVolume to update
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 guard let self = self else { return }
-                self.isSettingVolume = false
+                // Keep isSettingVolume true a bit longer to prevent checkVolume from interfering
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.isSettingVolume = false
+                }
                 
                 if let updatedVolume = self.audioSession?.outputVolume {
                     let actualVolume = updatedVolume
