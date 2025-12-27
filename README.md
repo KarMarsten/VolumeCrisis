@@ -51,7 +51,7 @@ A comprehensive iOS volume management companion app built with SwiftUI that help
 
 2. **Open in Xcode**
    ```bash
-   open VolumeCrisis/VolumeCrisis.xcodeproj
+   open VolumeCrisis.xcodeproj
    ```
 
 3. **Build and Run**
