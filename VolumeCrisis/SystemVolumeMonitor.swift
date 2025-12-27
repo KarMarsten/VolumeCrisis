@@ -724,6 +724,64 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         print("Background audio stopped")
     }
     
+    // Test function to verify slider functionality
+    func testSliderFunctionality() {
+        guard let slider = volumeSlider else {
+            print("❌ TEST FAILED: No volume slider available")
+            sliderStatus = "NOT AVAILABLE for testing"
+            return
+        }
+        
+        let currentVolume = AVAudioSession.sharedInstance().outputVolume
+        let testVolume = max(0.1, currentVolume - 0.05) // Reduce by 5% for test
+        
+        print("🧪 Testing slider functionality...")
+        print("   Current system volume: \(Int(currentVolume * 100))%")
+        print("   Test target: \(Int(testVolume * 100))%")
+        
+        let originalSliderValue = slider.value
+        slider.value = testVolume
+        slider.sendActions(for: .valueChanged)
+        
+        // Check after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            let newVolume = AVAudioSession.sharedInstance().outputVolume
+            let sliderValue = slider.value
+            
+            print("🧪 Test results:")
+            print("   Slider value: \(Int(sliderValue * 100))%")
+            print("   Actual system volume: \(Int(newVolume * 100))%")
+            
+            if abs(newVolume - testVolume) < 0.05 {
+                print("✅ TEST PASSED: Slider is functional")
+                self.sliderStatus = "Found and TESTED - WORKING"
+            } else if abs(newVolume - currentVolume) < 0.02 {
+                print("❌ TEST FAILED: Slider value changed but system volume did not")
+                print("   This indicates the slider is found but not functional on this device")
+                self.sliderStatus = "Found but NOT FUNCTIONAL (test failed)"
+            } else {
+                print("⚠️ TEST INCONCLUSIVE: Volume changed but not to target")
+                self.sliderStatus = "Found but PARTIALLY FUNCTIONAL"
+            }
+        }
+    }
+    
+    // Manual test function for debugging
+    func forceEnforcementTest() {
+        let currentVolume = AVAudioSession.sharedInstance().outputVolume
+        print("🧪 FORCE TEST: Current volume = \(Int(currentVolume * 100))%")
+        print("🧪 FORCE TEST: Ceiling = \(Int(systemVolumeCeiling * 100))%")
+        print("🧪 FORCE TEST: Slider available = \(volumeSlider != nil)")
+        
+        if currentVolume > systemVolumeCeiling {
+            print("🧪 FORCE TEST: Volume exceeds ceiling, attempting enforcement...")
+            setSystemVolume(systemVolumeCeiling)
+        } else {
+            print("🧪 FORCE TEST: Volume does not exceed ceiling")
+        }
+    }
+    
     deinit {
         monitoringTimer?.invalidate()
         audioSession?.removeObserver(self, forKeyPath: "outputVolume")
