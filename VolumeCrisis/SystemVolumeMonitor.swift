@@ -64,29 +64,50 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         // Note: MPVolumeView must be added to a view hierarchy to work
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            
+            // Remove old volume view if it exists
+            self.volumeView?.removeFromSuperview()
+            
             self.volumeView = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
             self.volumeView?.isHidden = true
+            self.volumeView?.showsVolumeSlider = true
+            self.volumeView?.showsRouteButton = false
             
             // Add to window so it's in the view hierarchy (required for MPVolumeView to work)
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                let window = windowScene.windows.first {
                 window.addSubview(self.volumeView!)
+                print("MPVolumeView added to window")
+            } else {
+                print("Error: Could not find window to add MPVolumeView")
             }
             
             // Find the volume slider in the MPVolumeView
             // Try multiple times as the slider may not be immediately available
             func findSlider(attempt: Int = 0) {
-                guard attempt < 10 else {
-                    print("Warning: Could not find system volume slider after 10 attempts")
+                guard attempt < 20 else {
+                    print("Error: Could not find system volume slider after 20 attempts")
                     return
                 }
                 
-                for subview in self.volumeView?.subviews ?? [] {
-                    if let slider = subview as? UISlider {
-                        self.volumeSlider = slider
-                        print("System volume slider found and ready (attempt \(attempt + 1))")
-                        return
+                // Search recursively through subviews
+                func searchSubviews(_ view: UIView) -> UISlider? {
+                    if let slider = view as? UISlider {
+                        return slider
                     }
+                    for subview in view.subviews {
+                        if let slider = searchSubviews(subview) {
+                            return slider
+                        }
+                    }
+                    return nil
+                }
+                
+                if let volumeView = self.volumeView, let slider = searchSubviews(volumeView) {
+                    self.volumeSlider = slider
+                    print("System volume slider found and ready (attempt \(attempt + 1))")
+                    print("Current slider value: \(Int(slider.value * 100))%")
+                    return
                 }
                 
                 // Retry if not found
