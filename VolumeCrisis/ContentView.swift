@@ -58,12 +58,14 @@ struct ContentView: View {
                                         .foregroundColor(.blue)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         
-                                        Button(action: {
-                                            if let user = userManager.selectedUser {
-                                                showEditPresetSheet = true
-                                                editingPreset = preset
-                                            }
-                                        }) {
+                                        Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
+                                            // Set system volume first (this affects all apps)
+                                            let clampedVolume = min(preset.volume, systemVolumeMonitor.systemVolumeCeiling)
+                                            systemVolumeMonitor.setSystemVolume(clampedVolume)
+                                            // Also update app volume for test sound
+                                            audioManager.volume = clampedVolume
+                                        }                                        
+                                    }) {
                                             Image(systemName: "pencil")
                                                 .foregroundColor(.orange)
                                         }
