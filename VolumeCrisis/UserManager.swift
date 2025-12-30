@@ -46,7 +46,7 @@ class UserManager: ObservableObject {
     private func saveUsers() {
         if let encoded = try? JSONEncoder().encode(users) {
             UserDefaults.standard.set(encoded, forKey: usersKey)
-            print("Users saved to UserDefaults")
+            debugLog("Users saved to UserDefaults", level: .info, category: .general)
         }
     }
     
@@ -54,14 +54,14 @@ class UserManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: usersKey),
            let decoded = try? JSONDecoder().decode([UserProfile].self, from: data) {
             users = decoded
-            print("Users loaded from UserDefaults: \(users.count) users")
+            debugLog("Users loaded from UserDefaults: \(users.count) users", level: .info, category: .general)
         }
     }
     
     private func saveSelectedUser() {
         if let selectedUser = selectedUser {
             UserDefaults.standard.set(selectedUser.id.uuidString, forKey: selectedUserIdKey)
-            print("Selected user saved: \(selectedUser.name)")
+            debugLog("Selected user saved: \(selectedUser.name)", level: .info, category: .general)
         } else {
             UserDefaults.standard.removeObject(forKey: selectedUserIdKey)
         }
@@ -72,7 +72,7 @@ class UserManager: ObservableObject {
            let selectedId = UUID(uuidString: selectedIdString) {
             selectedUser = users.first { $0.id == selectedId }
             if selectedUser != nil {
-                print("Selected user loaded: \(selectedUser?.name ?? "Unknown")")
+                debugLog("Selected user loaded: \(selectedUser?.name ?? "Unknown")", level: .info, category: .general)
             }
         }
         // If no selected user found, use first user
@@ -98,12 +98,12 @@ class UserManager: ObservableObject {
     func addPreset(to user: UserProfile, preset: VolumePreset) {
         // Find user by ID instead of using Equatable
         guard let index = users.firstIndex(where: { $0.id == user.id }) else {
-            print("User not found in users array")
+            debugLog("User not found in users array", level: .error, category: .ui)
             return
         }
-        print("Adding preset to user: \(user.name) at index: \(index)")
+        debugLog("Adding preset to user: \(user.name) at index: \(index)", level: .info, category: .ui)
         users[index].presets.append(preset)
-        print("Users array presets count: \(users[index].presets.count)")
+        debugLog("Users array presets count: \(users[index].presets.count)", level: .debug, category: .ui)
         
         // Save users (didSet will trigger automatically, but we call saveUsers directly for clarity)
         saveUsers()
@@ -111,7 +111,7 @@ class UserManager: ObservableObject {
         // Update selectedUser reference to point to the updated user
         if selectedUser?.id == user.id {
             selectedUser = users[index]
-            print("Updated selectedUser, presets count: \(selectedUser?.presets.count ?? 0)")
+            debugLog("Updated selectedUser, presets count: \(selectedUser?.presets.count ?? 0)", level: .debug, category: .ui)
         }
     }
 
@@ -122,7 +122,7 @@ class UserManager: ObservableObject {
     
     func deletePreset(from user: UserProfile, preset: VolumePreset) {
         guard let userIndex = users.firstIndex(where: { $0.id == user.id }) else {
-            print("User not found")
+            debugLog("User not found", level: .error, category: .ui)
             return
         }
         
@@ -139,7 +139,7 @@ class UserManager: ObservableObject {
     
     func updatePreset(for user: UserProfile, presetId: UUID, newName: String, newVolume: Float) {
         guard let userIndex = users.firstIndex(where: { $0.id == user.id }) else {
-            print("User not found")
+            debugLog("User not found", level: .error, category: .ui)
             return
         }
         

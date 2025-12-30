@@ -50,7 +50,6 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     // Flag to prevent checkVolume from overriding user-initiated volume changes
     private var isSettingVolume: Bool = false
-    private var lastVolumeSetAttempt: Date?
     
     // Diagnostic properties
     @Published var sliderStatus: String = "Unknown"
@@ -75,7 +74,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             if self?.isRunningOniPad == true {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     if self?.volumeSlider == nil {
-                        print("⚠️ Retrying volume slider setup for older iPad...")
+                        debugLog("Retrying volume slider setup for older iPad...", level: .warning, category: .slider)
                         self?.setupVolumeControl()
                     }
                 }
@@ -103,7 +102,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Activate the session
             try audioSession?.setActive(true, options: [])
-            print("✅ Audio session configured for background playback")
+            debugLog("Audio session configured for background playback", level: .success, category: .audio)
             
             // Add notification observers for audio session interruptions
             NotificationCenter.default.addObserver(
@@ -121,7 +120,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             )
             
         } catch {
-            print("❌ Failed to configure audio session: \(error.localizedDescription)")
+            debugLog("Failed to configure audio session: \(error.localizedDescription)", level: .error, category: .audio)
             // Retry after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 self?.setupAudioSession()
@@ -150,15 +149,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     @objc private func handleAppWillResignActive() {
-        print("📱 App entering background - ensuring monitoring continues...")
+        debugLog("App entering background - ensuring monitoring continues...", level: .info, category: .background)
         // Audio session should keep running for monitoring
     }
     
     @objc private func handleAppDidBecomeActive() {
-        print("📱 App became active - verifying monitoring...")
+        debugLog("App became active - verifying monitoring...", level: .info, category: .background)
         // Verify background audio is still running
         if backgroundEngine == nil || backgroundEngine?.isRunning == false {
-            print("⚠️ Background audio stopped - restarting...")
+            debugLog("Background audio stopped - restarting...", level: .warning, category: .background)
             startBackgroundAudio()
         }
     }
@@ -172,9 +171,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         switch type {
         case .began:
-            print("⚠️ Audio session interruption began")
+            debugLog("Audio session interruption began", level: .warning, category: .audio)
         case .ended:
-            print("✅ Audio session interruption ended")
+            debugLog("Audio session interruption ended", level: .success, category: .audio)
             // Reactivate audio session
             do {
                 try audioSession?.setActive(true, options: [])
@@ -183,7 +182,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                     startBackgroundAudio()
                 }
             } catch {
-                print("❌ Failed to reactivate audio session: \(error.localizedDescription)")
+                debugLog("Failed to reactivate audio session: \(error.localizedDescription)", level: .error, category: .audio)
             }
         @unknown default:
             break
@@ -197,7 +196,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             return
         }
         
-        print("📊 Audio route changed: \(reason)")
+        debugLog("Audio route changed: \(reason)", level: .info, category: .audio)
         // Re-check volume after route change
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.checkVolume()
@@ -243,9 +242,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             if let window = window {
                 window.addSubview(self.volumeView!)
-                print("MPVolumeView added to window (method: \(window.description))")
+                debugLog("MPVolumeView added to window (method: \(window.description))", level: .success, category: .slider)
             } else {
-                print("⚠️ Error: Could not find window to add MPVolumeView - will retry")
+                debugLog("Error: Could not find window to add MPVolumeView - will retry", level: .error, category: .slider)
                 // Retry after a delay - sometimes window isn't ready immediately
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                     self?.setupVolumeControl()
@@ -259,9 +258,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             func findSlider(attempt: Int = 0) {
                 guard attempt < maxAttempts else {
                     self.sliderStatus = "NOT FOUND after \(maxAttempts) attempts"
-                    print("⚠️ Error: Could not find system volume slider after \(maxAttempts) attempts")
+                    debugLog("Error: Could not find system volume slider after \(maxAttempts) attempts", level: .error, category: .slider)
                     if self.isRunningOniPad {
-                        print("⚠️ iPadOS: This may be an older device compatibility issue. Try restarting the app.")
+                        debugLog("iPadOS: This may be an older device compatibility issue. Try restarting the app.", level: .warning, category: .slider)
                     }
                     return
                 }
@@ -290,8 +289,8 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 if let volumeView = self.volumeView, let slider = searchSubviews(volumeView, depth: 0) {
                     self.volumeSlider = slider
                     self.sliderStatus = "Found (attempt \(attempt + 1))"
-                    print("✅ System volume slider found and ready (attempt \(attempt + 1))")
-                    print("Current slider value: \(Int(slider.value * 100))%")
+                    debugLog("System volume slider found and ready (attempt \(attempt + 1))", level: .success, category: .slider)
+                    debugLog("Current slider value: \(Int(slider.value * 100))%", level: .info, category: .slider)
                     // Test if slider is functional - delay to avoid blocking initialization
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                         self?.testSliderFunctionality()
@@ -324,13 +323,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
             // On iPadOS, we CAN reduce volume to enforce ceiling
             // This is the key functionality for ceiling enforcement
-            print("iPadOS: Enforcing ceiling - reducing volume from \(Int(systemVolume * 100))% to \(Int(clampedVolume * 100))%")
+            debugLog("iPadOS: Enforcing ceiling - reducing volume from \(Int(systemVolume * 100))% to \(Int(clampedVolume * 100))%", level: .info, category: .enforcement)
         }
         
         // Set flag to prevent checkVolume from overriding our change
         // Use a longer grace period to ensure volume change completes
         isSettingVolume = true
-        lastVolumeSetAttempt = Date()
         
         // Use MPVolumeView slider to set system volume
         DispatchQueue.main.async { [weak self] in
@@ -339,7 +337,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Ensure slider is available
             // This is CRITICAL for ceiling enforcement on iPadOS
             if self.volumeSlider == nil {
-                print("⚠️ Warning: Volume slider not found, attempting to setup...")
+                debugLog("Warning: Volume slider not found, attempting to setup...", level: .warning, category: .slider)
                 // Retry setup if slider not found - this is critical for iPadOS ceiling enforcement
                 self.setupVolumeControl()
                 
@@ -349,23 +347,16 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 
                 func retryVolumeSet() {
                     guard retryCount < maxRetries else {
-                        print("❌ CRITICAL ERROR: Volume slider still not found after \(maxRetries) retries.")
-                        print("❌ Ceiling enforcement CANNOT work without the volume slider.")
+                        debugLog("CRITICAL ERROR: Volume slider still not found after \(maxRetries) retries.", level: .error, category: .slider)
+                        debugLog("Ceiling enforcement CANNOT work without the volume slider.", level: .error, category: .enforcement)
                         if self.isRunningOniPad {
-                            print("⚠️ iPadOS: This is a critical failure. Ceiling enforcement will not work.")
-                            print("⚠️ Possible causes:")
-                            print("   - MPVolumeView not properly initialized")
-                            print("   - Window not available")
-                            print("   - Older iPad compatibility issue")
-                            print("⚠️ Try: Restart the app, ensure app is in foreground at least once")
+                            debugLog("iPadOS: This is a critical failure. Ceiling enforcement will not work.", level: .error, category: .enforcement)
+                            debugLog("Possible causes: MPVolumeView not properly initialized, Window not available, Older iPad compatibility issue", level: .warning, category: .slider)
+                            debugLog("Try: Restart the app, ensure app is in foreground at least once", level: .info, category: .slider)
                         }
                         // Log the current state for debugging
-                        print("📊 Debug Info:")
-                        print("   - Volume slider: \(self.volumeSlider == nil ? "NOT FOUND" : "FOUND")")
-                        print("   - Volume view: \(self.volumeView == nil ? "nil" : "exists")")
-                        print("   - Current volume: \(Int(self.systemVolume * 100))%")
-                        print("   - Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
-                        print("   - Is iPad: \(self.isRunningOniPad)")
+                        debugLog("Debug Info: Volume slider: \(self.volumeSlider == nil ? "NOT FOUND" : "FOUND"), Volume view: \(self.volumeView == nil ? "nil" : "exists")", level: .debug, category: .slider)
+                        debugLog("Debug Info: Current volume: \(Int(self.systemVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%, Is iPad: \(self.isRunningOniPad)", level: .debug, category: .volume)
                         return
                     }
                     
@@ -375,7 +366,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                         if let slider = self.volumeSlider {
                             slider.value = clampedVolume
                             slider.sendActions(for: .valueChanged)
-                            print("✅ Volume set after retry \(retryCount) to: \(Int(clampedVolume * 100))%")
+                            debugLog("Volume set after retry \(retryCount) to: \(Int(clampedVolume * 100))%", level: .success, category: .volume)
                         } else {
                             // Retry again
                             retryVolumeSet()
@@ -388,33 +379,33 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Set the volume value
             guard let slider = self.volumeSlider else {
-                print("Error: Volume slider is nil - attempting to find it...")
+                debugLog("Error: Volume slider is nil - attempting to find it...", level: .error, category: .slider)
                 // Try to setup volume control again
                 self.setupVolumeControl()
                 // Retry after a delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                     guard let self = self, let slider = self.volumeSlider else {
-                        print("Error: Volume slider still not found. Ceiling enforcement may be limited.")
+                        debugLog("Error: Volume slider still not found. Ceiling enforcement may be limited.", level: .error, category: .slider)
                         return
                     }
                     slider.value = clampedVolume
                     slider.sendActions(for: .valueChanged)
-                    print("Volume set after retry to: \(Int(clampedVolume * 100))%")
+                    debugLog("Volume set after retry to: \(Int(clampedVolume * 100))%", level: .success, category: .volume)
                 }
                 return
             }
             
             let currentSliderValue = slider.value
-            print("Setting system volume slider to: \(Int(clampedVolume * 100))% (current slider: \(Int(currentSliderValue * 100))%)")
+            debugLog("Setting system volume slider to: \(Int(clampedVolume * 100))% (current slider: \(Int(currentSliderValue * 100))%)", level: .info, category: .volume)
             
             // On iPadOS, we're reducing volume (enforcing ceiling), so this should work
             if self.isRunningOniPad {
-                print("iPadOS: Reducing volume to enforce ceiling: \(Int(clampedVolume * 100))%")
+                debugLog("iPadOS: Reducing volume to enforce ceiling: \(Int(clampedVolume * 100))%", level: .info, category: .enforcement)
             }
             
             // Store original slider value for verification
             let originalSliderValue = slider.value
-            print("📊 Slider state: Before=\(Int(originalSliderValue * 100))%, Target=\(Int(clampedVolume * 100))%")
+            debugLog("Slider state: Before=\(Int(originalSliderValue * 100))%, Target=\(Int(clampedVolume * 100))%", level: .debug, category: .slider)
             
             slider.value = clampedVolume
             // Trigger value changed event to ensure the change takes effect
@@ -423,9 +414,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Verify slider value was actually set
             let newSliderValue = slider.value
             if abs(newSliderValue - clampedVolume) > 0.01 {
-                print("⚠️ WARNING: Slider value not set correctly! Expected=\(Int(clampedVolume * 100))%, Got=\(Int(newSliderValue * 100))%")
+                debugLog("WARNING: Slider value not set correctly! Expected=\(Int(clampedVolume * 100))%, Got=\(Int(newSliderValue * 100))%", level: .warning, category: .slider)
             } else {
-                print("✅ Slider value set successfully: \(Int(newSliderValue * 100))%")
+                debugLog("Slider value set successfully: \(Int(newSliderValue * 100))%", level: .success, category: .slider)
             }
             
             // Update our tracked volume immediately for UI responsiveness
@@ -445,17 +436,17 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                         if abs(actualVolume - clampedVolume) < 0.05 {
                             // Volume change succeeded
                             self.systemVolume = actualVolume
-                            print("iOS: Volume successfully changed to: \(Int(actualVolume * 100))%")
+                            debugLog("iOS: Volume successfully changed to: \(Int(actualVolume * 100))%", level: .success, category: .volume)
                         } else {
                             // Volume change didn't work - might be simulator limitation
                             #if targetEnvironment(simulator)
-                            print("iOS Simulator: Volume control may not work in simulator. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
-                            print("Note: System volume control works better on physical devices.")
+                            debugLog("iOS Simulator: Volume control may not work in simulator. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%", level: .warning, category: .volume)
+                            debugLog("Note: System volume control works better on physical devices.", level: .info, category: .volume)
                             // Keep UI at requested value since simulator limitations
                             self.systemVolume = clampedVolume
                             #else
-                            print("iOS: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%")
-                            print("Note: If volume slider is not found, volume control may be limited.")
+                            debugLog("iOS: Volume change may not have taken effect. Expected: \(Int(clampedVolume * 100))%, Got: \(Int(actualVolume * 100))%", level: .warning, category: .volume)
+                            debugLog("Note: If volume slider is not found, volume control may be limited.", level: .info, category: .volume)
                             // Still update to actual volume to reflect reality
                             self.systemVolume = actualVolume
                             #endif
@@ -473,14 +464,14 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                             // 2. The difference is significant (> 8% to avoid false positives on older devices)
                             let difference = clampedVolume - actualVolume
                             if isActuallyIncreasing && difference > 0.08 {
-                                print("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.")
+                                debugLog("iPadOS: Cannot increase volume programmatically (Expected: \(Int(clampedVolume * 100))%, Actual: \(Int(actualVolume * 100))%). Use physical volume buttons.", level: .warning, category: .volume)
                             }
                             // Keep UI at requested value for visual feedback, but note it didn't work
                             // The actual system volume will be updated when user uses physical buttons
                         } else if clampedVolume < actualVolume {
                             // User tried to decrease volume - this should work (enforcing ceiling)
                             self.systemVolume = actualVolume
-                            print("iPadOS: Volume reduced to: \(Int(actualVolume * 100))% (enforcing ceiling)")
+                            debugLog("iPadOS: Volume reduced to: \(Int(actualVolume * 100))% (enforcing ceiling)", level: .success, category: .enforcement)
                         } else {
                             // Volume is the same - no change needed
                             self.systemVolume = actualVolume
@@ -489,7 +480,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 }
             }
             
-            print("System volume set to: \(Int(clampedVolume * 100))%")
+            debugLog("System volume set to: \(Int(clampedVolume * 100))%", level: .info, category: .volume)
         }
     }
     
@@ -509,7 +500,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             self?.checkVolume()
         }
         RunLoop.main.add(monitoringTimer!, forMode: .common)
-        print("📊 Volume monitoring started: Interval=\(interval)s, KVO=active, Background audio=\(isDeviceSoundOn ? "on" : "off")")
+        debugLog("Volume monitoring started: Interval=\(interval)s, KVO=active, Background audio=\(isDeviceSoundOn ? "on" : "off")", level: .success, category: .volume)
         
         // Always start background audio to keep app running in background
         // This is critical for ceiling enforcement when app is in background
@@ -532,7 +523,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Log volume changes for debugging (only when significant change or exceeds ceiling)
         if abs(newVolume - systemVolume) > 0.01 || newVolume > systemVolumeCeiling {
-            print("📊 Volume check: Current=\(Int(newVolume * 100))%, Tracked=\(Int(systemVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%")
+            debugLog("Volume check: Current=\(Int(newVolume * 100))%, Tracked=\(Int(systemVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%", level: .info, category: .volume)
         }
         
         // CRITICAL: Enforce volume ceiling FIRST - this must always work, even if we're setting volume
@@ -543,25 +534,25 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             if isSettingVolume {
                 // If we're setting volume but it exceeded ceiling, we need to enforce
                 // Reset the flag to allow enforcement
-                print("⚠️ Volume exceeded ceiling during volume set operation - enforcing ceiling immediately")
+                debugLog("Volume exceeded ceiling during volume set operation - enforcing ceiling immediately", level: .warning, category: .enforcement)
                 isSettingVolume = false
             }
-            print("⚠️ System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), enforcing ceiling...")
+            debugLog("System volume (\(Int(newVolume * 100))%) exceeds ceiling (\(Int(systemVolumeCeiling * 100))%), enforcing ceiling...", level: .warning, category: .enforcement)
             
             // Check if we have the volume slider - critical for enforcement
             if volumeSlider == nil {
-                print("❌ CRITICAL: Volume slider not available for ceiling enforcement!")
-                print("❌ Attempting emergency slider setup...")
+                debugLog("CRITICAL: Volume slider not available for ceiling enforcement!", level: .error, category: .enforcement)
+                debugLog("Attempting emergency slider setup...", level: .warning, category: .slider)
                 setupVolumeControl()
                 // Wait a moment and try again
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                     guard let self = self else { return }
                     if self.volumeSlider == nil {
-                        print("❌ FAILED: Volume slider still not available after emergency setup")
-                        print("❌ Ceiling enforcement cannot proceed without volume slider")
-                        print("📊 Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(self.systemVolumeCeiling * 100))%")
+                        debugLog("FAILED: Volume slider still not available after emergency setup", level: .error, category: .slider)
+                        debugLog("Ceiling enforcement cannot proceed without volume slider", level: .error, category: .enforcement)
+                        debugLog("Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(self.systemVolumeCeiling * 100))%", level: .debug, category: .volume)
                     } else {
-                        print("✅ Emergency slider setup successful, enforcing ceiling...")
+                        debugLog("Emergency slider setup successful, enforcing ceiling...", level: .success, category: .slider)
                         self.setSystemVolume(self.systemVolumeCeiling)
                     }
                 }
@@ -570,12 +561,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             
             // Check if slider is functional - if test showed it's not functional, don't try
             if !isSliderFunctional && sliderStatus.contains("NOT FUNCTIONAL") {
-                print("⚠️ CRITICAL LIMITATION: Volume slider is not functional on this device")
-                print("⚠️ Ceiling enforcement cannot work - slider found but doesn't control system volume")
-                print("⚠️ This is a hardware/OS limitation on some older iPads")
-                print("⚠️ iOS blocks programmatic volume control on these devices - no workaround available")
-                print("📊 Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%")
-                print("💡 Alternative: Use iOS Settings > Screen Time > Content & Privacy Restrictions > Volume Limit")
+                debugLog("CRITICAL LIMITATION: Volume slider is not functional on this device", level: .error, category: .slider)
+                debugLog("Ceiling enforcement cannot work - slider found but doesn't control system volume", level: .error, category: .enforcement)
+                debugLog("This is a hardware/OS limitation on some older iPads", level: .warning, category: .slider)
+                debugLog("iOS blocks programmatic volume control on these devices - no workaround available", level: .warning, category: .slider)
+                debugLog("Current state: Volume=\(Int(newVolume * 100))%, Ceiling=\(Int(systemVolumeCeiling * 100))%", level: .debug, category: .volume)
+                debugLog("Alternative: Use iOS Settings > Screen Time > Content & Privacy Restrictions > Volume Limit", level: .info, category: .general)
                 // Don't attempt enforcement - it won't work
                 return
             }
@@ -586,6 +577,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Reduce volume to ceiling
             // On iPadOS, this will work because we're reducing (not increasing)
             setSystemVolume(systemVolumeCeiling)
+            
+            // Update last enforcement attempt timestamp
+            lastEnforcementAttempt = Date().formatted(date: .omitted, time: .standard)
             
             // Verify the reduction worked after a delay
             // On iPadOS, we may need multiple attempts to reduce volume
@@ -603,11 +597,11 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                         if updatedVolume > self.systemVolumeCeiling {
                             // Volume still exceeds ceiling - retry enforcement
                             if verificationAttempt < maxVerificationAttempts {
-                                print("⚠️ Volume still exceeds ceiling after attempt \(verificationAttempt). Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...")
+                                debugLog("Volume still exceeds ceiling after attempt \(verificationAttempt). Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%. Retrying...", level: .warning, category: .enforcement)
                                 
                                 // Check if slider is still available
                                 if self.volumeSlider == nil {
-                                    print("❌ Volume slider lost during enforcement! Re-initializing...")
+                                    debugLog("Volume slider lost during enforcement! Re-initializing...", level: .error, category: .slider)
                                     self.setupVolumeControl()
                                     // Wait and retry
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -615,7 +609,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                                             self.setSystemVolume(self.systemVolumeCeiling)
                                             verifyAndRetry()
                                         } else {
-                                            print("❌ CRITICAL: Cannot enforce ceiling - volume slider unavailable")
+                                            debugLog("CRITICAL: Cannot enforce ceiling - volume slider unavailable", level: .error, category: .enforcement)
                                         }
                                     }
                                 } else {
@@ -624,27 +618,24 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                                 }
                             } else {
                                 self.enforcementFailureCount += 1
-                                print("❌ FAILED to enforce ceiling after \(maxVerificationAttempts) attempts.")
-                                print("❌ Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%")
-                                print("❌ Volume slider status: \(self.volumeSlider == nil ? "NOT AVAILABLE" : "AVAILABLE")")
-                                print("📊 Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)")
+                                debugLog("FAILED to enforce ceiling after \(maxVerificationAttempts) attempts.", level: .error, category: .enforcement)
+                                debugLog("Current: \(Int(updatedVolume * 100))%, Ceiling: \(Int(self.systemVolumeCeiling * 100))%", level: .error, category: .enforcement)
+                                debugLog("Volume slider status: \(self.volumeSlider == nil ? "NOT AVAILABLE" : "AVAILABLE")", level: .error, category: .slider)
+                                debugLog("Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)", level: .info, category: .enforcement)
                                 if self.isRunningOniPad {
-                                    print("⚠️ iPadOS: This indicates a critical issue with volume control.")
-                                    print("⚠️ Possible solutions:")
-                                    print("   1. Restart the app")
-                                    print("   2. Ensure app was in foreground at least once")
-                                    print("   3. Check if MPVolumeView is properly initialized")
+                                    debugLog("iPadOS: This indicates a critical issue with volume control.", level: .error, category: .enforcement)
+                                    debugLog("Possible solutions: Restart the app, Ensure app was in foreground at least once, Check if MPVolumeView is properly initialized", level: .info, category: .enforcement)
                                 }
                             }
                         } else {
                             // Successfully enforced ceiling
                             self.systemVolume = updatedVolume
                             self.enforcementSuccessCount += 1
-                            print("✅ Ceiling enforced successfully after \(verificationAttempt) attempt(s). Volume: \(Int(updatedVolume * 100))%")
-                            print("📊 Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)")
+                            debugLog("Ceiling enforced successfully after \(verificationAttempt) attempt(s). Volume: \(Int(updatedVolume * 100))%", level: .success, category: .enforcement)
+                            debugLog("Enforcement stats: Success=\(self.enforcementSuccessCount), Failures=\(self.enforcementFailureCount)", level: .info, category: .enforcement)
                         }
                     } else {
-                        print("⚠️ Warning: Could not read updated volume from audio session")
+                        debugLog("Warning: Could not read updated volume from audio session", level: .warning, category: .audio)
                     }
                 }
             }
@@ -661,13 +652,13 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 // This allows programmatic changes to complete before syncing
                 if abs(newVolume - systemVolume) > 0.02 {
                     systemVolume = newVolume
-                    print("iOS: System volume changed to: \(Int(newVolume * 100))%")
+                    debugLog("iOS: System volume changed to: \(Int(newVolume * 100))%", level: .info, category: .volume)
                 }
             } else {
                 // On iPadOS, only update if volume changed significantly (user used physical buttons)
                 if abs(newVolume - systemVolume) > 0.02 {
                     systemVolume = newVolume
-                    print("iPadOS: System volume changed via physical buttons to: \(Int(newVolume * 100))%")
+                    debugLog("iPadOS: System volume changed via physical buttons to: \(Int(newVolume * 100))%", level: .info, category: .volume)
                 }
             }
         }
@@ -694,12 +685,12 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         // Register background task BEFORE starting audio
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "VolumeMonitoring") { [weak self] in
             // Expiration handler - clean up gracefully
-            print("⚠️ Background task expiring - cleaning up...")
+            debugLog("Background task expiring - cleaning up...", level: .warning, category: .background)
             self?.endBackgroundTask()
         }
         
         guard backgroundTaskID != .invalid else {
-            print("❌ Failed to register background task")
+            debugLog("Failed to register background task", level: .error, category: .background)
             return
         }
         
@@ -711,13 +702,13 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         let frameCount = Int(sampleRate * duration)
         
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
-            print("Failed to create audio format")
+            debugLog("Failed to create audio format", level: .error, category: .audio)
             endBackgroundTask()
             return
         }
         
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount)) else {
-            print("Failed to create audio buffer")
+            debugLog("Failed to create audio buffer", level: .error, category: .audio)
             endBackgroundTask()
             return
         }
@@ -764,15 +755,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
             scheduleBuffer()
             
-            print("✅ Background audio started with task ID: \(backgroundTaskID)")
+            debugLog("Background audio started with task ID: \(backgroundTaskID)", level: .success, category: .background)
             
         } catch {
-            print("❌ Failed to start background audio: \(error.localizedDescription)")
+            debugLog("Failed to start background audio: \(error.localizedDescription)", level: .error, category: .background)
             endBackgroundTask()
             
             // Retry after a delay if it's an XPC or session issue
             if error.localizedDescription.contains("XPC") || error.localizedDescription.contains("interrupted") {
-                print("⚠️ Retrying background audio setup after interruption...")
+                debugLog("Retrying background audio setup after interruption...", level: .warning, category: .background)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                     self?.startBackgroundAudio()
                 }
@@ -786,14 +777,14 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         backgroundPlayerNode = nil
         backgroundEngine = nil
         endBackgroundTask()
-        print("Background audio stopped")
+        debugLog("Background audio stopped", level: .info, category: .background)
     }
     
     private func endBackgroundTask() {
         if backgroundTaskID != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTaskID)
             backgroundTaskID = .invalid
-            print("✅ Background task ended")
+            debugLog("Background task ended", level: .success, category: .background)
         }
     }
     
@@ -801,7 +792,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     // Run asynchronously to avoid blocking main thread
     func testSliderFunctionality() {
         guard let slider = volumeSlider else {
-            print("❌ TEST FAILED: No volume slider available")
+            debugLog("TEST FAILED: No volume slider available", level: .error, category: .slider)
             sliderStatus = "NOT AVAILABLE for testing"
             return
         }
@@ -814,16 +805,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Test by reducing volume slightly (only if we can reduce)
             // Don't test if volume is already very low
             guard currentVolume > 0.15 else {
-                print("🧪 TEST SKIPPED: Volume too low to test safely")
+                debugLog("TEST SKIPPED: Volume too low to test safely", level: .info, category: .slider)
                 self.sliderStatus = "Found (volume too low to test)"
                 return
             }
             
             let testVolume = max(0.1, currentVolume - 0.05) // Reduce by 5% for test
             
-            print("🧪 Testing slider functionality...")
-            print("   Current system volume: \(Int(currentVolume * 100))%")
-            print("   Test target: \(Int(testVolume * 100))%")
+            debugLog("Testing slider functionality...", level: .info, category: .slider)
+            debugLog("Current system volume: \(Int(currentVolume * 100))%, Test target: \(Int(testVolume * 100))%", level: .debug, category: .slider)
             
             let originalSliderValue = slider.value
             slider.value = testVolume
@@ -835,10 +825,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 let newVolume = AVAudioSession.sharedInstance().outputVolume
                 let sliderValue = slider.value
                 
-                print("🧪 Test results:")
-                print("   Slider value: \(Int(sliderValue * 100))%")
-                print("   Actual system volume: \(Int(newVolume * 100))%")
-                print("   Expected: \(Int(testVolume * 100))%")
+                debugLog("Test results: Slider value: \(Int(sliderValue * 100))%, Actual system volume: \(Int(newVolume * 100))%, Expected: \(Int(testVolume * 100))%", level: .debug, category: .slider)
                 
                 // Check if volume actually changed from original
                 let volumeChanged = abs(newVolume - currentVolume) > 0.02
@@ -846,18 +833,15 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 let closeToTarget = abs(newVolume - testVolume) < 0.05
                 
                 if closeToTarget {
-                    print("✅ TEST PASSED: Slider is functional - volume changed to target")
+                    debugLog("TEST PASSED: Slider is functional - volume changed to target", level: .success, category: .slider)
                     self.sliderStatus = "Found and TESTED - WORKING"
                     self.isSliderFunctional = true
                 } else if volumeChanged {
-                    print("⚠️ TEST PARTIAL: Slider changed volume but not to exact target")
-                    print("   This may indicate partial functionality on this device")
+                    debugLog("TEST PARTIAL: Slider changed volume but not to exact target. This may indicate partial functionality on this device", level: .warning, category: .slider)
                     self.sliderStatus = "Found but PARTIALLY FUNCTIONAL"
                     self.isSliderFunctional = true  // Still functional, just not precise
                 } else {
-                    print("❌ TEST FAILED: Slider value changed but system volume did not")
-                    print("   This indicates the slider is found but not functional on this device")
-                    print("   ⚠️ CRITICAL: Ceiling enforcement will NOT work on this device")
+                    debugLog("TEST FAILED: Slider value changed but system volume did not. CRITICAL: Ceiling enforcement will NOT work on this device", level: .error, category: .slider)
                     self.sliderStatus = "Found but NOT FUNCTIONAL - Ceiling enforcement disabled"
                     self.isSliderFunctional = false
                 }
@@ -872,17 +856,14 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             guard let self = self else { return }
             
             let currentVolume = AVAudioSession.sharedInstance().outputVolume
-            print("🧪 FORCE TEST: Current volume = \(Int(currentVolume * 100))%")
-            print("🧪 FORCE TEST: Ceiling = \(Int(self.systemVolumeCeiling * 100))%")
-            print("🧪 FORCE TEST: Slider available = \(self.volumeSlider != nil)")
-            print("🧪 FORCE TEST: Slider status = \(self.sliderStatus)")
+            debugLog("FORCE TEST: Current volume = \(Int(currentVolume * 100))%, Ceiling = \(Int(self.systemVolumeCeiling * 100))%", level: .info, category: .enforcement)
+            debugLog("FORCE TEST: Slider available = \(self.volumeSlider != nil), Slider status = \(self.sliderStatus)", level: .debug, category: .slider)
             
             if currentVolume > self.systemVolumeCeiling {
-                print("🧪 FORCE TEST: Volume exceeds ceiling, attempting enforcement...")
+                debugLog("FORCE TEST: Volume exceeds ceiling, attempting enforcement...", level: .info, category: .enforcement)
                 self.setSystemVolume(self.systemVolumeCeiling)
             } else {
-                print("🧪 FORCE TEST: Volume does not exceed ceiling")
-                print("🧪 FORCE TEST: To test enforcement, increase volume above ceiling first")
+                debugLog("FORCE TEST: Volume does not exceed ceiling. To test enforcement, increase volume above ceiling first", level: .info, category: .enforcement)
             }
         }
     }

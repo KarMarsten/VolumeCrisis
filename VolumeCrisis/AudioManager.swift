@@ -51,23 +51,23 @@ class AudioManager: ObservableObject {
     }
 
     func playSound(named name: String) {
-        print("Attempting to play sound: \(name)")
+        debugLog("Attempting to play sound: \(name)", level: .info, category: .audio)
         
         // Try to play bundled audio file first
         if let url = Bundle.main.url(forResource: name, withExtension: "mp3") {
-            print("Found mp3 file at: \(url)")
+            debugLog("Found mp3 file at: \(url)", level: .info, category: .audio)
             do {
                 player = try AVAudioPlayer(contentsOf: url)
                 player?.volume = min(volume, volumeCeiling)
                 player?.play()
                 isPlaying = true
-                print("Playing mp3 file successfully")
+                debugLog("Playing mp3 file successfully", level: .success, category: .audio)
                 return
             } catch {
-                print("Error playing mp3: \(error.localizedDescription)")
+                debugLog("Error playing mp3: \(error.localizedDescription)", level: .error, category: .audio)
             }
         } else {
-            print("No mp3 file found, creating tone")
+            debugLog("No mp3 file found, creating tone", level: .info, category: .audio)
         }
         
         // Create a simple tone that respects volume
@@ -110,9 +110,9 @@ class AudioManager: ObservableObject {
             playerNode.volume = min(volume, volumeCeiling)
             playerNode.play()
             isPlaying = true
-            print("Playing generated tone with volume: \(min(volume, volumeCeiling))")
+            debugLog("Playing generated tone with volume: \(min(volume, volumeCeiling))", level: .success, category: .audio)
         } catch {
-            print("Error playing tone: \(error.localizedDescription)")
+            debugLog("Error playing tone: \(error.localizedDescription)", level: .error, category: .audio)
             // Fallback to system sound
             AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
             isPlaying = true
@@ -120,7 +120,7 @@ class AudioManager: ObservableObject {
     }
     
     func stopSound() {
-        print("Stopping sound")
+        debugLog("Stopping sound", level: .info, category: .audio)
         player?.stop()
         audioPlayerNode?.stop()
         audioEngine?.stop()

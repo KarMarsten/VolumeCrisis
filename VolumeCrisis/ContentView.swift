@@ -4,9 +4,11 @@ struct ContentView: View {
     @StateObject var audioManager = AudioManager.shared
     @StateObject var userManager = UserManager()
     @StateObject var systemVolumeMonitor = SystemVolumeMonitor.shared
+    @StateObject var debugLogger = DebugLogger.shared
     @State private var showPresetSheet = false
     @State private var showEditPresetSheet = false
     @State private var editingPreset: VolumePreset?
+    @State private var showDebugView = false
 
     var body: some View {
         NavigationView {
@@ -151,7 +153,7 @@ struct ContentView: View {
                                 ), in: 0...systemVolumeMonitor.systemVolumeCeiling)
                                     .accentColor(.blue)
                                     .onChange(of: systemVolumeMonitor.systemVolume) { oldValue, newValue in
-                                        print("System volume changed to: \(Int(newValue * 100))%")
+                                        debugLog("System volume changed to: \(Int(newValue * 100))%", level: .info, category: .volume)
                                     }
                             } else {
                                 // On iPadOS, show read-only display (volume controlled via physical buttons)
@@ -242,11 +244,11 @@ struct ContentView: View {
                             Slider(value: $systemVolumeMonitor.systemVolumeCeiling, in: 0.1...1.0)
                                 .accentColor(.orange)
                                 .onChange(of: systemVolumeMonitor.systemVolumeCeiling) { oldValue, newValue in
-                                    print("System volume ceiling changed from \(Int(oldValue * 100))% to \(Int(newValue * 100))%")
+                                    debugLog("System volume ceiling changed from \(Int(oldValue * 100))% to \(Int(newValue * 100))%", level: .info, category: .volume)
                                     
                                     // If current volume exceeds new ceiling, reduce it
                                     if systemVolumeMonitor.systemVolume > newValue {
-                                        print("Current volume (\(Int(systemVolumeMonitor.systemVolume * 100))%) exceeds new ceiling (\(Int(newValue * 100))%), reducing volume...")
+                                        debugLog("Current volume (\(Int(systemVolumeMonitor.systemVolume * 100))%) exceeds new ceiling (\(Int(newValue * 100))%), reducing volume...", level: .warning, category: .enforcement)
                                         systemVolumeMonitor.setSystemVolume(newValue)
                                     }
                                 }
@@ -273,7 +275,7 @@ struct ContentView: View {
                             if newValue > audioManager.volumeCeiling {
                                 audioManager.volume = audioManager.volumeCeiling
                             }
-                            print("App volume changed to: \(Int(audioManager.volume * 100))%")
+                            debugLog("App volume changed to: \(Int(audioManager.volume * 100))%", level: .info, category: .volume)
                         }
                         .onChange(of: audioManager.volumeCeiling) { oldValue, newCeiling in
                             // If ceiling is reduced below current volume, adjust volume
@@ -293,7 +295,7 @@ struct ContentView: View {
                     Slider(value: $audioManager.volumeCeiling, in: 0.1...1.0)
                         .accentColor(.red)
                         .onChange(of: audioManager.volumeCeiling) { oldValue, newValue in
-                            print("Ceiling changed to: \(Int(newValue * 100))%")
+                            debugLog("Ceiling changed to: \(Int(newValue * 100))%", level: .info, category: .volume)
                         }
                 }
                 .padding()
@@ -316,6 +318,34 @@ struct ContentView: View {
                     .cornerRadius(8)
                 }
 
+                // Debug Section
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Debug")
+                            .font(.headline)
+                        Spacer()
+                        Toggle("", isOn: $debugLogger.isEnabled)
+                            .onChange(of: debugLogger.isEnabled) { oldValue, newValue in
+                                debugLog("Debug logging \(newValue ? "enabled" : "disabled")", level: .info, category: .general)
+                            }
+                    }
+                    .padding(.horizontal)
+                    
+                    Button("Show Debug Logs") {
+                        showDebugView = true
+                    }
+                    .foregroundColor(.blue)
+                    .padding(.horizontal)
+                    
+                    Button("Clear Debug Logs") {
+                        debugLogger.clear()
+                        debugLog("Debug logs cleared", level: .info, category: .general)
+                    }
+                    .foregroundColor(.orange)
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 8)
+
                 Spacer()
                     .frame(height: 20)
             }
@@ -329,6 +359,98 @@ struct ContentView: View {
                     EditPresetView(userManager: userManager, preset: preset)
                 }
             }
+            .sheet(isPresented: $showDebugView) {
+                DebugView()
+            }
+        }
+    }
+}
+
+struct DebugView: View {
+    @StateObject var debugLogger = DebugLogger.shared
+    @Environment(\.presentationMode) var presentationMode
+    @State private var selectedCategory: LogCategory? = nil
+    @State private var selectedLevel: LogLevel? = nil
+    
+    var filteredLogs: [DebugLogEntry] {
+        var logs = debugLogger.logs
+        if let category = selectedCategory {
+            logs = logs.filter { $0.category == category }
+        }
+        if let level = selectedLevel {
+            logs = logs.filter { $0.level == level }
+        }
+        return logs.reversed() // Show newest first
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                // Filter controls
+                HStack {
+                    Menu("Category: \(selectedCategory?.rawValue ?? "All")") {
+                        Button("All") { selectedCategory = nil }
+                        ForEach([LogCategory.general, .volume, .audio, .ui, .background, .enforcement, .slider], id: \.self) { category in
+                            Button(category.rawValue) { selectedCategory = category }
+                        }
+                    }
+                    
+                    Menu("Level: \(selectedLevel?.emoji ?? "All")") {
+                        Button("All") { selectedLevel = nil }
+                        ForEach([LogLevel.debug, .info, .warning, .error, .success], id: \.self) { level in
+                            Button("\(level.emoji) \(level.name)") { selectedLevel = level }
+                        }
+                    }
+                }
+                .padding()
+                
+                // Log list
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(filteredLogs) { log in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(log.level.emoji)
+                                    .font(.caption)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
+                                        Text(log.category.rawValue)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text(log.timestamp, style: .time)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Text(log.message)
+                                        .font(.caption)
+                                        .foregroundColor(log.level.color)
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                            .background(log.level.color.opacity(0.1))
+                            .cornerRadius(4)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Debug Logs (\(filteredLogs.count))")
+            .navigationBarItems(trailing: Button("Done") {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
+    }
+}
+
+extension LogLevel {
+    var name: String {
+        switch self {
+        case .debug: return "Debug"
+        case .info: return "Info"
+        case .warning: return "Warning"
+        case .error: return "Error"
+        case .success: return "Success"
         }
     }
 }
@@ -376,9 +498,9 @@ struct AddPresetView: View {
             Button("Add") {
                 if let user = userManager.selectedUser {
                     let newPreset = VolumePreset(id: UUID(), name: presetName, volume: presetVolume)
-                    print("Adding preset: \(presetName) with volume: \(presetVolume)")
+                    debugLog("Adding preset: \(presetName) with volume: \(presetVolume)", level: .info, category: .ui)
                     userManager.addPreset(to: user, preset: newPreset)
-                    print("Current presets count: \(userManager.selectedUser?.presets.count ?? 0)")
+                    debugLog("Current presets count: \(userManager.selectedUser?.presets.count ?? 0)", level: .debug, category: .ui)
                 }
                 presentationMode.wrappedValue.dismiss()
             }
