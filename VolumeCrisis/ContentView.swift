@@ -4,7 +4,6 @@ struct ContentView: View {
     @StateObject var audioManager = AudioManager.shared
     @StateObject var userManager = UserManager()
     @StateObject var systemVolumeMonitor = SystemVolumeMonitor.shared
-    @State private var showUserSheet = false
     @State private var showPresetSheet = false
     @State private var showEditPresetSheet = false
     @State private var editingPreset: VolumePreset?
@@ -13,17 +12,7 @@ struct ContentView: View {
         NavigationView {
             ScrollView(showsIndicators: true) {
                 VStack(spacing: 16) {
-                    // User section with proper spacing
-                    VStack(spacing: 8) {
-                        Text("Current User: \(userManager.selectedUser?.name ?? "None")")
-                            .font(.headline)
-                        Button("Switch User") { showUserSheet = true }
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 16)
-                
-                // Volume Guide Section
+                    // Volume Guide Section
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Volume Guide")
                         .font(.headline)
@@ -53,18 +42,19 @@ struct ContentView: View {
                                 ForEach(selectedUser.presets) { preset in
                                     HStack {
                                         Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
-                                            audioManager.volume = preset.volume
-                                        }
-                                        .foregroundColor(.blue)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        
-                                        Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
                                             // Set system volume first (this affects all apps)
                                             let clampedVolume = min(preset.volume, systemVolumeMonitor.systemVolumeCeiling)
                                             systemVolumeMonitor.setSystemVolume(clampedVolume)
                                             // Also update app volume for test sound
-                                            audioManager.volume = clampedVolume                                        
-                                    }) {
+                                            audioManager.volume = clampedVolume
+                                        }
+                                        .foregroundColor(.blue)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Button(action: {
+                                            editingPreset = preset
+                                            showEditPresetSheet = true
+                                        }) {
                                             Image(systemName: "pencil")
                                                 .foregroundColor(.orange)
                                         }
@@ -331,9 +321,6 @@ struct ContentView: View {
             }
             .padding(.bottom, 20)
             .navigationTitle("Volume Crisis")
-            .sheet(isPresented: $showUserSheet) {
-                UserSelectionView(userManager: userManager)
-            }
             .sheet(isPresented: $showPresetSheet) {
                 AddPresetView(userManager: userManager)
             }
@@ -368,32 +355,6 @@ struct VolumeGuideCard: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
         .frame(width: 120)
-    }
-}
-
-struct UserSelectionView: View {
-    @ObservedObject var userManager: UserManager
-    @Environment(\.presentationMode) var presentationMode
-    @State private var newUserName = ""
-
-    var body: some View {
-        VStack {
-            List {
-                ForEach(userManager.users) { user in
-                    Button(user.name) {
-                        userManager.selectUser(user)
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            }
-            HStack {
-                TextField("New user name", text: $newUserName)
-                Button("Add") {
-                    userManager.addUser(name: newUserName)
-                    newUserName = ""
-                }
-            }.padding()
-        }
     }
 }
 
