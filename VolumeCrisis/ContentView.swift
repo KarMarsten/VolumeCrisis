@@ -443,18 +443,6 @@ struct DebugView: View {
     }
 }
 
-extension LogLevel {
-    var name: String {
-        switch self {
-        case .debug: return "Debug"
-        case .info: return "Info"
-        case .warning: return "Warning"
-        case .error: return "Error"
-        case .success: return "Success"
-        }
-    }
-}
-
 struct VolumeGuideCard: View {
     let title: String
     let description: String

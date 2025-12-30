@@ -88,6 +88,16 @@ enum LogLevel {
         case .success: return .green
         }
     }
+    
+    var name: String {
+        switch self {
+        case .debug: return "Debug"
+        case .info: return "Info"
+        case .warning: return "Warning"
+        case .error: return "Error"
+        case .success: return "Success"
+        }
+    }
 }
 
 enum LogCategory: String {
