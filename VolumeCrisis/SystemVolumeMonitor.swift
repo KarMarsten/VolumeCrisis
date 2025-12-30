@@ -60,22 +60,46 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        // Load saved settings immediately (fast operation)
         loadSystemVolumeCeiling()
-        setupAudioSession()
-        setupAppStateObservers()
-        startMonitoring()
         
-        // Ensure volume slider is set up early - critical for iPadOS ceiling enforcement
-        // On older devices, give more time for window to be available
-        let delay = isRunningOniPad ? 1.0 : 0.5
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.setupVolumeControl()
-            // On older iPads, also retry after a longer delay as backup
-            if self?.isRunningOniPad == true {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                    if self?.volumeSlider == nil {
-                        debugLog("Retrying volume slider setup for older iPad...", level: .warning, category: .slider)
-                        self?.setupVolumeControl()
+        // Get initial volume immediately (fast operation)
+        let currentSystemVolume = AVAudioSession.sharedInstance().outputVolume
+        systemVolume = currentSystemVolume
+        isDeviceSoundOn = systemVolume > 0.0
+        
+        // Check if this is first launch (no saved ceiling means first launch)
+        let isFirstLaunch = UserDefaults.standard.object(forKey: systemVolumeCeilingKey) == nil
+        
+        // Defer all heavy initialization to avoid blocking app launch
+        // This prevents Signal 9 termination from watchdog timeout
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.setupAudioSession()
+            self.setupAppStateObservers()
+            self.startMonitoring()
+            
+            // On first launch, set system volume to 50% (only on iPhone where we can control it)
+            if isFirstLaunch && self.canControlSystemVolume {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    guard let self = self else { return }
+                    debugLog("First launch: Setting default system volume to 50%", level: .info, category: .volume)
+                    self.setSystemVolume(0.5)
+                }
+            }
+            
+            // Ensure volume slider is set up early - critical for iPadOS ceiling enforcement
+            // On older devices, give more time for window to be available
+            let delay = self.isRunningOniPad ? 1.0 : 0.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.setupVolumeControl()
+                // On older iPads, also retry after a longer delay as backup
+                if self?.isRunningOniPad == true {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        if self?.volumeSlider == nil {
+                            debugLog("Retrying volume slider setup for older iPad...", level: .warning, category: .slider)
+                            self?.setupVolumeControl()
+                        }
                     }
                 }
             }
@@ -89,6 +113,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private func loadSystemVolumeCeiling() {
         if UserDefaults.standard.object(forKey: systemVolumeCeilingKey) != nil {
             systemVolumeCeiling = UserDefaults.standard.float(forKey: systemVolumeCeilingKey)
+        } else {
+            // First launch: set default ceiling to 70%
+            systemVolumeCeiling = 0.7
+            debugLog("First launch: Setting default safety ceiling to 70%", level: .info, category: .volume)
         }
     }
     
@@ -127,8 +155,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             }
         }
         
-        // Setup MPVolumeView for system volume control
-        setupVolumeControl()
+        // Note: setupVolumeControl() is called asynchronously from init() to avoid blocking app launch
     }
     
     private func setupAppStateObservers() {
@@ -266,36 +293,39 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
                 }
                 
                 // Search recursively through subviews
-                // Optimized to avoid deep recursion and reduce main thread blocking
-                func searchSubviews(_ view: UIView, depth: Int = 0) -> UISlider? {
-                    // Limit search depth to avoid performance issues on complex view hierarchies
-                    guard depth < 10 else { return nil }
-                    
-                    // Check current view first
-                    if let slider = view as? UISlider {
-                        return slider
-                    }
-                    
-                    // Search subviews (limit to first 20 to avoid blocking on complex hierarchies)
-                    let subviewsToSearch = Array(view.subviews.prefix(20))
-                    for subview in subviewsToSearch {
-                        if let slider = searchSubviews(subview, depth: depth + 1) {
+                // Must be on main thread for UIView access, but keep search lightweight
+                if let volumeView = self.volumeView, !volumeView.subviews.isEmpty {
+                    // Lightweight synchronous search with limits to avoid blocking
+                    func searchSubviews(_ view: UIView, depth: Int = 0) -> UISlider? {
+                        // Limit search depth and breadth to avoid blocking
+                        guard depth < 8 else { return nil }
+                        
+                        // Check current view first
+                        if let slider = view as? UISlider {
                             return slider
                         }
+                        
+                        // Limit subview search to avoid blocking on complex hierarchies
+                        let subviewsToSearch = Array(view.subviews.prefix(15))
+                        for subview in subviewsToSearch {
+                            if let slider = searchSubviews(subview, depth: depth + 1) {
+                                return slider
+                            }
+                        }
+                        return nil
                     }
-                    return nil
-                }
-                
-                if let volumeView = self.volumeView, let slider = searchSubviews(volumeView, depth: 0) {
-                    self.volumeSlider = slider
-                    self.sliderStatus = "Found (attempt \(attempt + 1))"
-                    debugLog("System volume slider found and ready (attempt \(attempt + 1))", level: .success, category: .slider)
-                    debugLog("Current slider value: \(Int(slider.value * 100))%", level: .info, category: .slider)
-                    // Test if slider is functional - delay to avoid blocking initialization
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                        self?.testSliderFunctionality()
+                    
+                    if let slider = searchSubviews(volumeView, depth: 0) {
+                        self.volumeSlider = slider
+                        self.sliderStatus = "Found (attempt \(attempt + 1))"
+                        debugLog("System volume slider found and ready (attempt \(attempt + 1))", level: .success, category: .slider)
+                        debugLog("Current slider value: \(Int(slider.value * 100))%", level: .info, category: .slider)
+                        // Test if slider is functional - delay to avoid blocking initialization
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                            self?.testSliderFunctionality()
+                        }
+                        return
                     }
-                    return
                 }
                 
                 // Retry if not found - use longer delay on older devices
@@ -313,17 +343,21 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     func setSystemVolume(_ volume: Float) {
         let clampedVolume = max(0.0, min(1.0, volume))
         
+        // Update UI immediately for responsiveness
+        systemVolume = clampedVolume
+        
         // On iPadOS, we can only reduce volume (enforce ceiling), not increase it
         // On iOS, we can set volume in both directions
         if isRunningOniPad {
-            if clampedVolume > systemVolume {
-                // Trying to increase volume on iPadOS - this won't work
-                // This should only happen from UI (which is disabled), so silently return
+            if clampedVolume > AVAudioSession.sharedInstance().outputVolume {
+                // Trying to increase volume on iPadOS - this won't work programmatically
+                // User must use physical buttons to increase
+                debugLog("iPadOS: Cannot increase volume programmatically. Use physical buttons to increase, then app will enforce ceiling.", level: .info, category: .volume)
                 return
             }
             // On iPadOS, we CAN reduce volume to enforce ceiling
             // This is the key functionality for ceiling enforcement
-            debugLog("iPadOS: Enforcing ceiling - reducing volume from \(Int(systemVolume * 100))% to \(Int(clampedVolume * 100))%", level: .info, category: .enforcement)
+            debugLog("iPadOS: Enforcing ceiling - reducing volume from \(Int(AVAudioSession.sharedInstance().outputVolume * 100))% to \(Int(clampedVolume * 100))%", level: .info, category: .enforcement)
         }
         
         // Set flag to prevent checkVolume from overriding our change
@@ -485,8 +519,8 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     private func startMonitoring() {
-        // Get initial volume
-        systemVolume = AVAudioSession.sharedInstance().outputVolume
+        // Initial volume already set in init() to avoid blocking
+        // Just ensure isDeviceSoundOn is correct
         isDeviceSoundOn = systemVolume > 0.0
         
         // Observe volume changes using KVO (event-driven, battery efficient)
@@ -494,8 +528,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Periodic check as backup - more frequent to catch volume changes from other apps
         // KVO handles most volume changes, but this ensures we catch changes from other apps
-        // On iPadOS, use 1 second intervals for faster detection of volume changes from apps like YouTube Kids
-        let interval = isRunningOniPad ? 1.0 : 2.0
+        // Use very frequent intervals to catch aggressive apps like YouTube Kids quickly
+        // YouTube Kids can change volume rapidly, so we need fast response
+        let interval = 0.5 // Check every 0.5 seconds for fast response
         monitoringTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.checkVolume()
         }
@@ -504,7 +539,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Always start background audio to keep app running in background
         // This is critical for ceiling enforcement when app is in background
-        startBackgroundAudio()
+        // Defer to avoid blocking app launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startBackgroundAudio()
+        }
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
@@ -574,23 +612,23 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             // Update UI immediately to show we're enforcing
             systemVolume = systemVolumeCeiling
             
-            // Reduce volume to ceiling
-            // On iPadOS, this will work because we're reducing (not increasing)
-            setSystemVolume(systemVolumeCeiling)
-            
             // Update last enforcement attempt timestamp
             lastEnforcementAttempt = Date().formatted(date: .omitted, time: .standard)
             
+            // Reduce volume to ceiling immediately
+            // On iPadOS, this will work because we're reducing (not increasing)
+            // For aggressive apps like YouTube Kids, we need immediate enforcement
+            setSystemVolume(systemVolumeCeiling)
+            
             // Verify the reduction worked after a delay
-            // On iPadOS, we may need multiple attempts to reduce volume
-            // Use more aggressive verification on iPadOS
+            // Use more aggressive verification for apps that rapidly change volume
             var verificationAttempt = 0
-            let maxVerificationAttempts = isRunningOniPad ? 10 : 3  // More attempts on iPadOS
+            let maxVerificationAttempts = 15  // More attempts to handle aggressive apps
             
             func verifyAndRetry() {
                 verificationAttempt += 1
-                // Use shorter delay on iPadOS for faster response
-                let delay = isRunningOniPad ? 0.3 : 0.5
+                // Use very short delay for fast response to aggressive apps like YouTube Kids
+                let delay = 0.2  // Check every 200ms for rapid enforcement
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self = self else { return }
                     if let updatedVolume = self.audioSession?.outputVolume {
@@ -756,6 +794,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
             scheduleBuffer()
             
             debugLog("Background audio started with task ID: \(backgroundTaskID)", level: .success, category: .background)
+            
+            // End the background task now - audio session will keep app alive
+            // Background tasks are for short-term setup, not long-running audio
+            endBackgroundTask()
             
         } catch {
             debugLog("Failed to start background audio: \(error.localizedDescription)", level: .error, category: .background)

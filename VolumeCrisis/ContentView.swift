@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     @StateObject var audioManager = AudioManager.shared
@@ -9,6 +10,39 @@ struct ContentView: View {
     @State private var showEditPresetSheet = false
     @State private var editingPreset: VolumePreset?
     @State private var showDebugView = false
+    
+    private func handlePresetTap(preset: VolumePreset) {
+        // Set system volume first (this affects all apps)
+        let presetVolume = preset.volume
+        let ceiling = systemVolumeMonitor.systemVolumeCeiling
+        let clampedVolume = min(presetVolume, ceiling)
+        
+        let presetName = preset.name
+        let clampedPercent = Int(clampedVolume * 100)
+        let ceilingPercent = Int(ceiling * 100)
+        debugLog("Preset '\(presetName)' tapped: Setting volume to \(clampedPercent)% (ceiling: \(ceilingPercent)%)", level: .info, category: .ui)
+        
+        systemVolumeMonitor.setSystemVolume(clampedVolume)
+        // Also update app volume for test sound
+        audioManager.volume = clampedVolume
+        
+        // Verify volume was set after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let actualVolume = AVAudioSession.sharedInstance().outputVolume
+            let volumeDiff = abs(actualVolume - clampedVolume)
+            let expectedPercent = Int(clampedVolume * 100)
+            let actualPercent = Int(actualVolume * 100)
+            
+            if volumeDiff > 0.05 {
+                debugLog("WARNING: Preset volume not applied correctly. Expected: \(expectedPercent)%, Actual: \(actualPercent)%", level: .warning, category: .volume)
+                let sliderAvailable = systemVolumeMonitor.isSliderAvailable
+                let sliderStatus = systemVolumeMonitor.sliderStatus
+                debugLog("Volume slider available: \(sliderAvailable), Status: \(sliderStatus)", level: .debug, category: .slider)
+            } else {
+                debugLog("Preset volume applied successfully: \(actualPercent)%", level: .success, category: .volume)
+            }
+        }
+    }
 
     var body: some View {
         NavigationView {
@@ -44,11 +78,7 @@ struct ContentView: View {
                                 ForEach(selectedUser.presets) { preset in
                                     HStack {
                                         Button("\(preset.name) (\(Int(preset.volume * 100))%)") {
-                                            // Set system volume first (this affects all apps)
-                                            let clampedVolume = min(preset.volume, systemVolumeMonitor.systemVolumeCeiling)
-                                            systemVolumeMonitor.setSystemVolume(clampedVolume)
-                                            // Also update app volume for test sound
-                                            audioManager.volume = clampedVolume
+                                            handlePresetTap(preset: preset)
                                         }
                                         .foregroundColor(.blue)
                                         .frame(maxWidth: .infinity, alignment: .leading)
