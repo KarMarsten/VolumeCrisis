@@ -29,9 +29,22 @@
 		D3E099622E21BD810058835F /* VolumeCrisisUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VolumeCrisisUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D3E520F92F0458DD004EBC7A /* Exceptions for "VolumeCrisis" folder in "VolumeCrisis" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D3E0994A2E21BD800058835F /* VolumeCrisis */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D3E0994D2E21BD800058835F /* VolumeCrisis */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D3E520F92F0458DD004EBC7A /* Exceptions for "VolumeCrisis" folder in "VolumeCrisis" target */,
+			);
 			path = VolumeCrisis;
 			sourceTree = "<group>";
 		};
@@ -400,6 +413,7 @@
 				DEVELOPMENT_TEAM = UAHR3JWC24;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VolumeCrisis/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
@@ -429,6 +443,7 @@
 				DEVELOPMENT_TEAM = UAHR3JWC24;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VolumeCrisis/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
