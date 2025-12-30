@@ -45,6 +45,9 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     private var backgroundEngine: AVAudioEngine?
     private var backgroundPlayerNode: AVAudioPlayerNode?
     
+    // Background task management
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    
     // Flag to prevent checkVolume from overriding user-initiated volume changes
     private var isSettingVolume: Bool = false
     private var lastVolumeSetAttempt: Date?
@@ -60,6 +63,7 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         super.init()
         loadSystemVolumeCeiling()
         setupAudioSession()
+        setupAppStateObservers()
         startMonitoring()
         
         // Ensure volume slider is set up early - critical for iPadOS ceiling enforcement
@@ -126,6 +130,37 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         
         // Setup MPVolumeView for system volume control
         setupVolumeControl()
+    }
+    
+    private func setupAppStateObservers() {
+        // Observe app state changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppWillResignActive),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleAppWillResignActive() {
+        print("📱 App entering background - ensuring monitoring continues...")
+        // Audio session should keep running for monitoring
+    }
+    
+    @objc private func handleAppDidBecomeActive() {
+        print("📱 App became active - verifying monitoring...")
+        // Verify background audio is still running
+        if backgroundEngine == nil || backgroundEngine?.isRunning == false {
+            print("⚠️ Background audio stopped - restarting...")
+            startBackgroundAudio()
+        }
     }
     
     @objc private func handleAudioSessionInterruption(notification: Notification) {
@@ -651,42 +686,44 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     }
     
     private func startBackgroundAudio() {
-        // Create a silent audio loop to keep the app running in background
-        // This is CRITICAL for ceiling enforcement when app is in background
-        // Always start background audio to ensure app stays active for monitoring
-        if let existingEngine = backgroundEngine {
-            // Already running, but verify it's still active
-            if existingEngine.isRunning == false {
-                print("Background audio stopped unexpectedly - restarting...")
-                stopBackgroundAudio()
-                // Continue to start new background audio below
-            } else {
-                return // Already running
-            }
+        // Don't start if already running
+        guard backgroundEngine == nil || backgroundEngine?.isRunning == false else {
+            return
+        }
+        
+        // Register background task BEFORE starting audio
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "VolumeMonitoring") { [weak self] in
+            // Expiration handler - clean up gracefully
+            print("⚠️ Background task expiring - cleaning up...")
+            self?.endBackgroundTask()
+        }
+        
+        guard backgroundTaskID != .invalid else {
+            print("❌ Failed to register background task")
+            return
         }
         
         let audioEngine = AVAudioEngine()
         let playerNode = AVAudioPlayerNode()
         
-        // Create a longer silent buffer (1 second) to reduce scheduling overhead
-        // Longer buffer = fewer callbacks = better battery life
         let sampleRate: Double = 44100
         let duration: Double = 1.0
         let frameCount = Int(sampleRate * duration)
         
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
             print("Failed to create audio format")
+            endBackgroundTask()
             return
         }
         
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount)) else {
             print("Failed to create audio buffer")
+            endBackgroundTask()
             return
         }
         
         buffer.frameLength = AVAudioFrameCount(frameCount)
         
-        // Fill with silence (zeros)
         if let channelData = buffer.floatChannelData {
             channelData[0].initialize(repeating: 0.0, count: Int(buffer.frameLength))
         }
@@ -695,40 +732,44 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: format)
         
         do {
-            // Ensure audio session is active before starting engine
             try audioSession?.setActive(true, options: [])
-            
             try audioEngine.start()
-            playerNode.volume = 0.0 // Silent
+            playerNode.volume = 0.0
             playerNode.play()
             
-            // Schedule buffer to loop continuously
-            // Use a weak capture to avoid retain cycles
+            // Store references
+            self.backgroundEngine = audioEngine
+            self.backgroundPlayerNode = playerNode
+            
+            // Schedule with recursion limit to prevent infinite loop
+            var scheduleCount = 0
+            let maxSchedules = 3600 // 1 hour at 1 second per buffer
+            
             func scheduleBuffer() {
-                // Check if engine is still running before scheduling
-                guard let engine = self.backgroundEngine, engine.isRunning else {
-                    print("⚠️ Background audio engine stopped, cannot schedule buffer")
+                guard let engine = self.backgroundEngine,
+                      engine.isRunning,
+                      scheduleCount < maxSchedules else {
+                    if scheduleCount >= maxSchedules {
+                        print("⚠️ Max schedule count reached - restarting background audio")
+                        self.stopBackgroundAudio()
+                        self.startBackgroundAudio()
+                    }
                     return
                 }
                 
+                scheduleCount += 1
                 playerNode.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
-                    // Reschedule when buffer finishes to create infinite loop
-                    guard let self = self, let engine = self.backgroundEngine, engine.isRunning else {
-                        print("⚠️ Background audio stopped, not rescheduling")
-                        return
-                    }
                     scheduleBuffer()
                 }
             }
             scheduleBuffer()
             
-            // Keep references to prevent deallocation
-            self.backgroundEngine = audioEngine
-            self.backgroundPlayerNode = playerNode
+            print("✅ Background audio started with task ID: \(backgroundTaskID)")
             
-            print("✅ Background audio started - app will run in background")
         } catch {
             print("❌ Failed to start background audio: \(error.localizedDescription)")
+            endBackgroundTask()
+            
             // Retry after a delay if it's an XPC or session issue
             if error.localizedDescription.contains("XPC") || error.localizedDescription.contains("interrupted") {
                 print("⚠️ Retrying background audio setup after interruption...")
@@ -744,7 +785,16 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
         backgroundEngine?.stop()
         backgroundPlayerNode = nil
         backgroundEngine = nil
+        endBackgroundTask()
         print("Background audio stopped")
+    }
+    
+    private func endBackgroundTask() {
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+            print("✅ Background task ended")
+        }
     }
     
     // Test function to verify slider functionality
@@ -840,11 +890,10 @@ class SystemVolumeMonitor: NSObject, ObservableObject {
     deinit {
         monitoringTimer?.invalidate()
         audioSession?.removeObserver(self, forKeyPath: "outputVolume")
+        NotificationCenter.default.removeObserver(self)
         stopBackgroundAudio()
-        // Clean up volume view
         volumeView?.removeFromSuperview()
         volumeView = nil
         volumeSlider = nil
     }
 }
-
