@@ -63,8 +63,7 @@ struct ContentView: View {
                                             let clampedVolume = min(preset.volume, systemVolumeMonitor.systemVolumeCeiling)
                                             systemVolumeMonitor.setSystemVolume(clampedVolume)
                                             // Also update app volume for test sound
-                                            audioManager.volume = clampedVolume
-                                        }                                        
+                                            audioManager.volume = clampedVolume                                        
                                     }) {
                                             Image(systemName: "pencil")
                                                 .foregroundColor(.orange)
